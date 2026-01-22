@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import WidgetKit
 
 @MainActor
 class ProfileManager: ObservableObject {
@@ -51,6 +52,9 @@ class ProfileManager: ObservableObject {
         }
 
         displayMode = profileStore.loadDisplayMode()
+
+        // Sync existing data to App Groups for widget access
+        syncExistingDataToWidget()
 
         LoggingService.shared.log("ProfileManager: Loaded \(profiles.count) profile(s), active: \(activeProfile?.name ?? "none")")
     }
@@ -123,6 +127,10 @@ class ProfileManager: ObservableObject {
         }
 
         profileStore.saveProfiles(profiles)
+
+        // Refresh widget with updated profile data
+        syncExistingDataToWidget()
+
         LoggingService.shared.log("Deleted profile: \(profileName)")
     }
 
@@ -142,6 +150,12 @@ class ProfileManager: ObservableObject {
     func updateDisplayMode(_ mode: ProfileDisplayMode) {
         displayMode = mode
         profileStore.saveDisplayMode(mode)
+
+        // Refresh widget when switching between single/multi profile display
+        if #available(macOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+
         LoggingService.shared.log("Updated display mode to: \(mode.rawValue)")
     }
 
@@ -229,6 +243,9 @@ class ProfileManager: ObservableObject {
 
         switchingSemaphore = false
         isSwitchingProfile = false
+
+        // Sync new profile's data to widget
+        syncExistingDataToWidget()
 
         LoggingService.shared.log("Successfully activated profile: \(updatedProfile.name)")
     }
@@ -324,11 +341,53 @@ class ProfileManager: ObservableObject {
         // Update activeProfile reference if it's the same profile
         if activeProfile?.id == profileId {
             activeProfile = profiles[index]
+            // Sync to App Groups for widget access
+            syncUsageToWidgetStorage(usage)
         }
 
         // Save to persistent storage
         profileStore.saveProfiles(profiles)
         LoggingService.shared.log("Saved Claude usage for profile: \(profiles[index].name)")
+    }
+
+    /// Syncs usage data to App Groups container for widget access
+    private func syncUsageToWidgetStorage(_ usage: ClaudeUsage) {
+        let encoder = JSONEncoder()
+
+        // Try UserDefaults first
+        if let groupDefaults = UserDefaults(suiteName: Constants.appGroupIdentifier) {
+            do {
+                let data = try encoder.encode(usage)
+                groupDefaults.set(data, forKey: Constants.UserDefaultsKeys.claudeUsageData)
+                groupDefaults.synchronize()
+                LoggingService.shared.log("ProfileManager: Synced usage to widget (UserDefaults)")
+            } catch {
+                LoggingService.shared.logError("ProfileManager: UserDefaults encode failed: \(error)")
+            }
+        }
+
+        // Also write to file directly using proper App Groups API
+        guard let groupContainerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: Constants.appGroupIdentifier
+        ) else {
+            LoggingService.shared.logError("ProfileManager: App Group container not available for file write")
+            return
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: groupContainerURL, withIntermediateDirectories: true)
+            let fileURL = groupContainerURL.appendingPathComponent("claudeUsageData.json")
+            let data = try encoder.encode(usage)
+            try data.write(to: fileURL)
+            LoggingService.shared.log("ProfileManager: Synced usage to widget (file)")
+        } catch {
+            LoggingService.shared.logError("ProfileManager: File write failed: \(error)")
+        }
+
+        // Trigger widget refresh
+        if #available(macOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 
     /// Loads Claude usage data for a specific profile
@@ -348,11 +407,50 @@ class ProfileManager: ObservableObject {
         // Update activeProfile reference if it's the same profile
         if activeProfile?.id == profileId {
             activeProfile = profiles[index]
+            // Sync to App Groups for widget access
+            syncAPIUsageToWidgetStorage(usage)
         }
 
         // Save to persistent storage
         profileStore.saveProfiles(profiles)
         LoggingService.shared.log("Saved API usage for profile: \(profiles[index].name)")
+    }
+
+    /// Syncs API usage data to App Groups container for widget access
+    private func syncAPIUsageToWidgetStorage(_ usage: APIUsage) {
+        guard let groupDefaults = UserDefaults(suiteName: Constants.appGroupIdentifier) else {
+            return
+        }
+
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(usage)
+            groupDefaults.set(data, forKey: Constants.UserDefaultsKeys.apiUsageData)
+
+            // Trigger widget refresh
+            if #available(macOS 14.0, *) {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        } catch {
+            LoggingService.shared.logError("ProfileManager: Failed to sync API usage to widget: \(error.localizedDescription)")
+        }
+    }
+
+    /// Syncs existing profile data to App Groups container (called on app launch)
+    private func syncExistingDataToWidget() {
+        guard let profile = activeProfile else { return }
+
+        // Sync Claude usage if available
+        if let usage = profile.claudeUsage {
+            syncUsageToWidgetStorage(usage)
+            LoggingService.shared.log("ProfileManager: Synced existing Claude usage to widget on launch")
+        }
+
+        // Sync API usage if available
+        if let apiUsage = profile.apiUsage {
+            syncAPIUsageToWidgetStorage(apiUsage)
+            LoggingService.shared.log("ProfileManager: Synced existing API usage to widget on launch")
+        }
     }
 
     /// Loads API usage data for a specific profile

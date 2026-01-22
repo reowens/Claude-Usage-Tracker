@@ -770,6 +770,11 @@ class MenuBarManager: NSObject, ObservableObject {
         NSApplication.shared.terminate(nil)
     }
 
+    /// Public method to show settings window (for App Intents)
+    func showSettings() {
+        preferencesClicked()
+    }
+
     /// Shows the GitHub star prompt window
     func showGitHubStarPrompt() {
         // If window already exists, just bring it to front

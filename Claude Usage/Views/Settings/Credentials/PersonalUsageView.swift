@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 // MARK: - Wizard State Machine
 
@@ -233,6 +234,11 @@ struct PersonalUsageView: View {
 
             // Reset wizard
             wizardState = WizardState()
+
+            // Refresh widget to reflect credential removal
+            if #available(macOS 14.0, *) {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
 
             LoggingService.shared.log("PersonalUsageView: Successfully removed Claude.ai credentials")
 
@@ -671,6 +677,11 @@ struct ConfirmStep: View {
                     // Post single notification for credential change
                     if keyChanged || orgChanged {
                         NotificationCenter.default.post(name: .credentialsChanged, object: nil)
+                    }
+
+                    // Refresh widget to reflect new credentials
+                    if #available(macOS 14.0, *) {
+                        WidgetCenter.shared.reloadAllTimelines()
                     }
 
                     // Reload credentials display

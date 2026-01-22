@@ -24,6 +24,11 @@ class SharedDataStore {
         static let statuslineShowProgressBar = "statuslineShowProgressBar"
         static let statuslineShowResetTime = "statuslineShowResetTime"
 
+        // Widget Settings
+        static let widgetStyle = "widgetStyle"
+        static let smallWidgetMetric = "smallWidgetMetric"
+        static let mediumWidgetLayout = "mediumWidgetLayout"
+
         // Setup State
         static let hasCompletedSetup = "hasCompletedSetup"
         static let hasShownWizardOnce = "hasShownWizardOnce"
@@ -39,9 +44,14 @@ class SharedDataStore {
     }
 
     init() {
-        // Use standard UserDefaults (app container)
-        self.defaults = UserDefaults.standard
-        LoggingService.shared.log("SharedDataStore: Using standard app container storage")
+        // Use App Groups UserDefaults for sharing data with widgets
+        if let groupDefaults = UserDefaults(suiteName: Constants.appGroupIdentifier) {
+            self.defaults = groupDefaults
+            LoggingService.shared.log("SharedDataStore: Using App Groups shared container")
+        } else {
+            self.defaults = UserDefaults.standard
+            LoggingService.shared.log("SharedDataStore: Fallback to standard app container (App Groups unavailable)")
+        }
     }
 
     // MARK: - Language & Localization
@@ -109,6 +119,44 @@ class SharedDataStore {
             return true
         }
         return defaults.bool(forKey: Keys.statuslineShowResetTime)
+    }
+
+    // MARK: - Widget Settings
+
+    func saveWidgetStyle(_ style: WidgetStyle) {
+        defaults.set(style.rawValue, forKey: Keys.widgetStyle)
+    }
+
+    func loadWidgetStyle() -> WidgetStyle {
+        guard let rawValue = defaults.string(forKey: Keys.widgetStyle),
+              let style = WidgetStyle(rawValue: rawValue) else {
+            return .standard  // Default to standard
+        }
+        return style
+    }
+
+    func saveSmallWidgetMetric(_ metric: SmallWidgetMetric) {
+        defaults.set(metric.rawValue, forKey: Keys.smallWidgetMetric)
+    }
+
+    func loadSmallWidgetMetric() -> SmallWidgetMetric {
+        guard let rawValue = defaults.string(forKey: Keys.smallWidgetMetric),
+              let metric = SmallWidgetMetric(rawValue: rawValue) else {
+            return .session  // Default to session
+        }
+        return metric
+    }
+
+    func saveMediumWidgetLayout(_ layout: MediumWidgetLayout) {
+        defaults.set(layout.rawValue, forKey: Keys.mediumWidgetLayout)
+    }
+
+    func loadMediumWidgetLayout() -> MediumWidgetLayout {
+        guard let rawValue = defaults.string(forKey: Keys.mediumWidgetLayout),
+              let layout = MediumWidgetLayout(rawValue: rawValue) else {
+            return .sessionWeekly  // Default to session + weekly
+        }
+        return layout
     }
 
     // MARK: - Setup State

@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import UserNotifications
+import WidgetKit
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var menuBarManager: MenuBarManager?
@@ -32,6 +33,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             self,
             selector: #selector(handleShowSetupWizard),
             name: .showSetupWizard,
+            object: nil
+        )
+
+        // Listen for App Intent triggers (Control Center / Shortcuts)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRefreshFromIntent),
+            name: .refreshUsageFromIntent,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenSettingsFromIntent),
+            name: .openSettingsFromIntent,
             object: nil
         )
 
@@ -141,6 +157,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         showSetupWizardManually()
     }
 
+    /// Handles refresh request from App Intents (Control Center / Shortcuts)
+    @objc private func handleRefreshFromIntent() {
+        LoggingService.shared.log("AppDelegate: Received refreshUsageFromIntent notification")
+        menuBarManager?.refreshUsage()
+    }
+
+    /// Handles open settings request from App Intents
+    @objc private func handleOpenSettingsFromIntent() {
+        LoggingService.shared.log("AppDelegate: Received openSettingsFromIntent notification")
+        menuBarManager?.showSettings()
+    }
+
     /// Shows the setup wizard window (can be called manually for testing)
     func showSetupWizardManually() {
         LoggingService.shared.log("AppDelegate: showSetupWizardManually called")
@@ -179,6 +207,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         setupWindow = window
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Refresh widget timelines when app becomes active to clear stale cached data
+        if #available(macOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

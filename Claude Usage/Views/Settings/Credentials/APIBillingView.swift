@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 // MARK: - Wizard State Machine
 
@@ -231,6 +232,11 @@ struct APIBillingView: View {
 
             // Reset wizard
             wizardState = APIWizardState()
+
+            // Refresh widget to reflect credential removal
+            if #available(macOS 14.0, *) {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
 
             LoggingService.shared.log("APIBillingView: Successfully removed API Console credentials")
 
@@ -636,6 +642,11 @@ struct APIConfirmStep: View {
                     if keyChanged || orgChanged {
                         // Post notification to trigger refresh only if credentials actually changed
                         NotificationCenter.default.post(name: .credentialsChanged, object: nil)
+                    }
+
+                    // Refresh widget to reflect new credentials
+                    if #available(macOS 14.0, *) {
+                        WidgetCenter.shared.reloadAllTimelines()
                     }
 
                     // Reload credentials display

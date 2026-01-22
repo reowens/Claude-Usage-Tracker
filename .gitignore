@@ -140,3 +140,6 @@ release/
 *.zip
 
 .idea
+
+# Logs
+logs/

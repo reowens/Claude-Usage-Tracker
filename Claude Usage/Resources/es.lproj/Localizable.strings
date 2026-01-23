@@ -333,7 +333,7 @@
 "claudecode.requirement_restart" = "• Reiniciar Claude CLI después de aplicar cambios";
 "claudecode.error_no_components" = "Seleccione al menos un componente para mostrar";
 "claudecode.error_no_sessionkey" = "Clave de sesión no configurada. Por favor configúrela en la pestaña de Uso Personal primero.";
-"claudecode.success_applied" = "¡Configuración aplicada! Reinicia Claude CLI para ver los cambios.";
+"claudecode.success_applied" = "Configuration applied! Restart Claude CLI to see changes.";
 "claudecode.success_disabled" = "Línea de estado deshabilitada. Reinicia Claude CLI.";
 "claudecode.preview_no_components" = "No hay componentes seleccionados";
 

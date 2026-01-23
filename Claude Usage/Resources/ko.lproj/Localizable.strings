@@ -454,7 +454,7 @@
 "claudecode.requirement_restart" = "• 변경사항 적용 후 Claude CLI 재시작";
 "claudecode.error_no_components" = "표시할 구성요소를 하나 이상 선택하세요";
 "claudecode.error_no_sessionkey" = "세션 키가 구성되지 않았습니다. 먼저 개인 사용량 탭에서 설정하세요.";
-"claudecode.success_applied" = "구성이 적용되었습니다! 변경사항을 보려면 Claude CLI를 재시작하세요.";
+"claudecode.success_applied" = "Configuration applied! Restart Claude CLI to see changes.";
 "claudecode.success_disabled" = "상태 표시줄이 비활성화되었습니다. Claude CLI를 재시작하세요.";
 "claudecode.preview_no_components" = "선택된 구성요소 없음";
 

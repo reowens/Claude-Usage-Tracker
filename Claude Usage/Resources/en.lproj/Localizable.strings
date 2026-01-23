@@ -345,11 +345,11 @@
 "claudecode.component_progressbar" = "Progress bar";
 "claudecode.component_resettime" = "Reset time";
 "claudecode.requirement_sessionkey" = "• Session key configured in Credentials → Claude.ai tab";
-"claudecode.requirement_restart" = "• Restart Claude CLI after applying changes";
+"claudecode.requirement_restart" = "• Changes apply automatically after 1-2 prompts, or restart Claude CLI immediately";
 "claudecode.error_no_components" = "Please select at least one component to display";
 "claudecode.error_no_sessionkey" = "Session key not configured. Please set it in the Personal Usage tab first.";
-"claudecode.success_applied" = "Configuration applied! Restart Claude CLI to see changes.";
-"claudecode.success_disabled" = "Statusline disabled. Restart Claude CLI.";
+"claudecode.success_applied" = "Configuration applied! Changes will appear after 1-2 prompts, or restart Claude CLI to see them immediately.";
+"claudecode.success_disabled" = "Statusline disabled. Restart Claude CLI or wait for automatic refresh.";
 "claudecode.preview_no_components" = "No components selected";
 
 /* ==================== */

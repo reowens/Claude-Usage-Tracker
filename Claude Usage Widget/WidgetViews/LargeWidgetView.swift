@@ -10,7 +10,6 @@ import WidgetKit
 
 struct LargeWidgetView: View {
     let entry: UsageEntry
-    let style: WidgetAppearanceStyle
 
     var body: some View {
         if let usage = entry.usage {
@@ -32,6 +31,7 @@ struct LargeWidgetView: View {
                     .background(dividerColor)
 
                 // Main metrics grid - optimized for ~364x364 widget
+                // Show extra usage if any metric is at 0% and extra data is available
                 LazyVGrid(columns: [
                     GridItem(.flexible(), spacing: WidgetDesign.Spacing.cardSpacing),
                     GridItem(.flexible(), spacing: WidgetDesign.Spacing.cardSpacing)
@@ -40,41 +40,82 @@ struct LargeWidgetView: View {
                     MetricTile(
                         title: "Session",
                         percentage: usage.sessionPercentage,
-                        statusLevel: usage.statusLevel,
                         subtitle: WidgetDateFormatter.shortTimeString(from: usage.sessionResetTime),
                         icon: "clock.fill",
-                        style: style
+                        colorMode: entry.colorMode,
+                        customColorHex: entry.customColorHex
                     )
 
                     // Weekly Usage
                     MetricTile(
                         title: "Weekly",
                         percentage: usage.weeklyPercentage,
-                        statusLevel: usage.weeklyStatusLevel,
                         subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                         icon: "calendar",
-                        style: style
+                        colorMode: entry.colorMode,
+                        customColorHex: entry.customColorHex
                     )
 
-                    // Opus Usage
-                    MetricTile(
-                        title: "Opus",
-                        percentage: usage.opusPercentage,
-                        statusLevel: statusLevel(for: usage.opusPercentage),
-                        subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
-                        icon: "star.fill",
-                        style: style
-                    )
+                    // Opus Usage - show Extra if Opus is 0% and extra data exists
+                    if usage.opusPercentage > 0 {
+                        MetricTile(
+                            title: "Opus",
+                            percentage: usage.opusPercentage,
+                            subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
+                            icon: "star.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    } else if let extraPercentage = usage.extraPercentage {
+                        MetricTile(
+                            title: "Extra",
+                            percentage: extraPercentage,
+                            subtitle: extraSubtitle(for: usage, format: entry.extraUsageFormat),
+                            icon: "dollarsign.circle.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    } else {
+                        MetricTile(
+                            title: "Opus",
+                            percentage: usage.opusPercentage,
+                            subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
+                            icon: "star.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    }
 
-                    // Sonnet Usage
-                    MetricTile(
-                        title: "Sonnet",
-                        percentage: usage.sonnetPercentage,
-                        statusLevel: statusLevel(for: usage.sonnetPercentage),
-                        subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
-                        icon: "bolt.fill",
-                        style: style
-                    )
+                    // Sonnet Usage - show Extra if Sonnet is 0% and extra data exists (and wasn't shown for Opus)
+                    if usage.sonnetPercentage > 0 {
+                        MetricTile(
+                            title: "Sonnet",
+                            percentage: usage.sonnetPercentage,
+                            subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
+                            icon: "bolt.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    } else if let extraPercentage = usage.extraPercentage, usage.opusPercentage > 0 {
+                        // Only show extra here if we didn't already show it for Opus
+                        MetricTile(
+                            title: "Extra",
+                            percentage: extraPercentage,
+                            subtitle: extraSubtitle(for: usage, format: entry.extraUsageFormat),
+                            icon: "dollarsign.circle.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    } else {
+                        MetricTile(
+                            title: "Sonnet",
+                            percentage: usage.sonnetPercentage,
+                            subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
+                            icon: "bolt.fill",
+                                colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex
+                        )
+                    }
                 }
 
                 // API Usage (if available)
@@ -122,33 +163,18 @@ struct LargeWidgetView: View {
         }
     }
 
-    // MARK: - Style-dependent colors
+    // MARK: - Colors
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
     }
 
     private var dividerColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassDivider)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardDivider)
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassDivider)
     }
 
     private var ringBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardProgressBg)
-        }
+        Color.white.opacity(0.15)  // Very subtle background for ring track
     }
 
     private var noDataView: some View {
@@ -187,15 +213,31 @@ struct LargeWidgetView: View {
             return .critical
         }
     }
+
+    private func extraSubtitle(for usage: WidgetUsageData, format: ExtraUsageDisplayFormat) -> String {
+        switch format {
+        case .percentage:
+            // Show reset time when format is percentage (since percentage is already in main display)
+            return WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime)
+        case .currency:
+            // Show currency amount
+            return usage.formattedExtraUsed ?? "$0.00"
+        case .both:
+            // Show both currency and reset time
+            let currency = usage.formattedExtraUsed ?? "$0.00"
+            let resetTime = WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime)
+            return "\(currency) • \(resetTime)"
+        }
+    }
 }
 
 struct MetricTile: View {
     let title: String
     let percentage: Double
-    let statusLevel: WidgetStatusLevel
     let subtitle: String
     let icon: String
-    let style: WidgetAppearanceStyle
+    let colorMode: WidgetColorDisplayMode
+    let customColorHex: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -208,7 +250,7 @@ struct MetricTile: View {
                     .foregroundColor(secondaryTextColor)
             }
 
-            Text("\(Int(percentage))%")
+            Text("\(Int(percentage.rounded()))%")
                 .font(.system(size: WidgetDesign.Typography.percentageMedium, weight: .bold, design: .rounded))
                 .foregroundColor(statusColor)
 
@@ -230,47 +272,30 @@ struct MetricTile: View {
                 .foregroundColor(secondaryTextColor)
         }
         .padding(WidgetDesign.Spacing.cardPadding)
-        .background(tileBackgroundColor)
+        .background(tileBackground)
         .cornerRadius(WidgetDesign.Spacing.cardCornerRadius)
     }
 
-    // MARK: - Style-dependent colors
+    // MARK: - Colors
 
-    private var tileBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassCardBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardCardBg)
-        }
+    private var tileBackground: some View {
+        // Use very subtle white tint for glass - maintains desktop transparency
+        Color.white.opacity(0.05)
     }
 
     private var progressBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardProgressBg)
-        }
+        Color.white.opacity(0.15)  // Very subtle background for progress track
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
     }
 
     private var statusColor: Color {
-        switch statusLevel {
-        case .safe:
-            return .green
-        case .moderate:
-            return .orange
-        case .critical:
-            return .red
-        }
+        return WidgetDataProvider.shared.colorForUsage(
+            percentage,
+            mode: colorMode,
+            customColorHex: customColorHex
+        )
     }
 }

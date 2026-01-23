@@ -66,13 +66,32 @@ struct WidgetUsageData: Codable {
         return formatCurrency(limit, currency: currency)
     }
 
+    /// Formats extra usage for display based on format preference
+    func formattedExtraDisplay(format: ExtraUsageDisplayFormat) -> String? {
+        guard let percentage = extraPercentage else { return nil }
+
+        switch format {
+        case .percentage:
+            return "\(Int(percentage.rounded()))%"
+        case .currency:
+            return formattedExtraUsed ?? "$0.00"
+        case .both:
+            let percentStr = "\(Int(percentage.rounded()))%"
+            let currencyStr = formattedExtraUsed ?? "$0.00"
+            return "\(percentStr) • \(currencyStr)"
+        }
+    }
+
     private func formatCurrency(_ amount: Double, currency: String) -> String {
+        // Convert from cents to dollars
+        let dollars = amount / 100.0
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = currency
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(currency) \(String(format: "%.2f", amount))"
+        return formatter.string(from: NSNumber(value: dollars)) ?? "\(currency) \(String(format: "%.2f", dollars))"
     }
 
     static var preview: WidgetUsageData {
@@ -134,12 +153,6 @@ enum WidgetStatusLevel {
     case critical
 }
 
-/// Widget appearance style (mirrors main app's WidgetStyle)
-enum WidgetAppearanceStyle: String {
-    case standard = "standard"
-    case glass = "glass"
-}
-
 /// Widget small metric selection (mirrors main app's SmallWidgetMetric)
 enum WidgetSmallMetric: String {
     case session = "session"
@@ -170,42 +183,18 @@ enum WidgetSmallMetric: String {
 }
 
 /// Widget medium layout selection (mirrors main app's MediumWidgetLayout)
-enum WidgetMediumLayout: String {
-    case sessionWeekly = "session_weekly"
-    case sessionOpus = "session_opus"
-    case sessionSonnet = "session_sonnet"
-    case sessionExtra = "session_extra"
-    case weeklyOpus = "weekly_opus"
-    case weeklySonnet = "weekly_sonnet"
-    case weeklyExtra = "weekly_extra"
-    case opusSonnet = "opus_sonnet"
-    case opusExtra = "opus_extra"
-    case sonnetExtra = "sonnet_extra"
-
-    var leftMetric: WidgetSmallMetric {
-        switch self {
-        case .sessionWeekly, .sessionOpus, .sessionSonnet, .sessionExtra: return .session
-        case .weeklyOpus, .weeklySonnet, .weeklyExtra: return .weekly
-        case .opusSonnet, .opusExtra: return .opus
-        case .sonnetExtra: return .sonnet
-        }
-    }
-
-    var rightMetric: WidgetSmallMetric {
-        switch self {
-        case .sessionWeekly: return .weekly
-        case .sessionOpus, .weeklyOpus: return .opus
-        case .sessionSonnet, .weeklySonnet, .opusSonnet: return .sonnet
-        case .sessionExtra, .weeklyExtra, .opusExtra, .sonnetExtra: return .extra
-        }
-    }
-}
-
 /// Widget color display mode (mirrors main app's WidgetColorMode)
 enum WidgetColorDisplayMode: String {
     case multiColor = "multiColor"
     case monochrome = "monochrome"
     case singleColor = "singleColor"
+}
+
+/// Extra usage display format (mirrors main app's ExtraUsageDisplayFormat)
+enum ExtraUsageDisplayFormat: String {
+    case percentage = "percentage"
+    case currency = "currency"
+    case both = "both"
 }
 
 // MARK: - Widget Date Formatter
@@ -439,16 +428,6 @@ class WidgetDataProvider {
         }
     }
 
-    /// Loads widget appearance style from shared storage
-    func loadWidgetStyle() -> WidgetAppearanceStyle {
-        guard let defaults = defaults,
-              let rawValue = defaults.string(forKey: "widgetStyle"),
-              let style = WidgetAppearanceStyle(rawValue: rawValue) else {
-            return .standard
-        }
-        return style
-    }
-
     /// Loads small widget metric preference from shared storage
     func loadSmallWidgetMetric() -> WidgetSmallMetric {
         guard let defaults = defaults,
@@ -459,14 +438,24 @@ class WidgetDataProvider {
         return metric
     }
 
-    /// Loads medium widget layout preference from shared storage
-    func loadMediumWidgetLayout() -> WidgetMediumLayout {
+    /// Loads medium widget left metric preference from shared storage
+    func loadMediumWidgetLeftMetric() -> WidgetSmallMetric {
         guard let defaults = defaults,
-              let rawValue = defaults.string(forKey: "mediumWidgetLayout"),
-              let layout = WidgetMediumLayout(rawValue: rawValue) else {
-            return .sessionWeekly  // Default to session + weekly
+              let rawValue = defaults.string(forKey: "mediumWidgetLeftMetric"),
+              let metric = WidgetSmallMetric(rawValue: rawValue) else {
+            return .session  // Default left metric
         }
-        return layout
+        return metric
+    }
+
+    /// Loads medium widget right metric preference from shared storage
+    func loadMediumWidgetRightMetric() -> WidgetSmallMetric {
+        guard let defaults = defaults,
+              let rawValue = defaults.string(forKey: "mediumWidgetRightMetric"),
+              let metric = WidgetSmallMetric(rawValue: rawValue) else {
+            return .weekly  // Default right metric
+        }
+        return metric
     }
 
     /// Loads widget color mode preference from shared storage
@@ -484,20 +473,28 @@ class WidgetDataProvider {
         return defaults?.string(forKey: "widgetSingleColorHex") ?? "#00BFFF"  // Default cyan
     }
 
+    /// Loads extra usage display format from shared storage
+    func loadExtraUsageDisplayFormat() -> ExtraUsageDisplayFormat {
+        guard let defaults = defaults,
+              let rawValue = defaults.string(forKey: "extraUsageDisplayFormat"),
+              let format = ExtraUsageDisplayFormat(rawValue: rawValue) else {
+            return .percentage  // Default to showing percentage
+        }
+        return format
+    }
+
     /// Returns color for usage percentage based on color mode
     func colorForUsage(_ percentage: Double, mode: WidgetColorDisplayMode, customColorHex: String) -> Color {
         switch mode {
         case .multiColor:
-            // Threshold-based colors
+            // Threshold-based colors (matching menu bar)
             switch percentage {
-            case 90...:
-                return .red
-            case 75..<90:
-                return .orange
-            case 50..<75:
-                return .yellow
-            default:
-                return .green
+            case 0..<50:
+                return .green    // Safe
+            case 50..<80:
+                return .orange   // Moderate
+            default: // 80%+
+                return .red      // Critical
             }
         case .monochrome:
             return .primary

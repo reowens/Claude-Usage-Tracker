@@ -10,7 +10,6 @@ import WidgetKit
 
 struct MediumWidgetView: View {
     let entry: UsageEntry
-    let style: WidgetAppearanceStyle
 
     var body: some View {
         if let usage = entry.usage {
@@ -28,20 +27,24 @@ struct MediumWidgetView: View {
                         .foregroundColor(secondaryTextColor)
                 }
 
-                // Usage cards with configurable layout
+                // Usage cards with independent metric selection
                 HStack(spacing: WidgetDesign.Spacing.cardSpacing) {
-                    // Left card based on layout selection
+                    // Left card
                     UsageCard(
-                        metric: entry.mediumLayout.leftMetric,
+                        metric: entry.mediumLeftMetric,
                         usage: usage,
-                        style: style
+                        colorMode: entry.colorMode,
+                        customColorHex: entry.customColorHex,
+                        extraUsageFormat: entry.extraUsageFormat
                     )
 
-                    // Right card based on layout selection
+                    // Right card
                     UsageCard(
-                        metric: entry.mediumLayout.rightMetric,
+                        metric: entry.mediumRightMetric,
                         usage: usage,
-                        style: style
+                        colorMode: entry.colorMode,
+                        customColorHex: entry.customColorHex,
+                        extraUsageFormat: entry.extraUsageFormat
                     )
                 }
             }
@@ -59,15 +62,10 @@ struct MediumWidgetView: View {
         return "Updated \(formatter.localizedString(for: date, relativeTo: Date()))"
     }
 
-    // MARK: - Style-dependent colors
+    // MARK: - Colors
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
     }
 
     private var noDataView: some View {
@@ -95,7 +93,9 @@ struct MediumWidgetView: View {
 struct UsageCard: View {
     let metric: WidgetSmallMetric
     let usage: WidgetUsageData
-    let style: WidgetAppearanceStyle
+    let colorMode: WidgetColorDisplayMode
+    let customColorHex: String
+    let extraUsageFormat: ExtraUsageDisplayFormat
 
     private var metricData: MetricDisplayData {
         getMetricData(for: metric, usage: usage)
@@ -115,7 +115,7 @@ struct UsageCard: View {
             }
 
             // Percentage
-            Text("\(Int(metricData.percentage))%")
+            Text("\(Int(metricData.percentage.rounded()))%")
                 .font(.system(size: WidgetDesign.Typography.percentageMedium, weight: .bold, design: .rounded))
                 .foregroundColor(statusColor)
 
@@ -132,15 +132,15 @@ struct UsageCard: View {
             }
             .frame(height: WidgetDesign.Spacing.progressHeight)
 
-            // Reset time (exact format matching menu bar)
-            Text(WidgetDateFormatter.resetTimeString(from: metricData.resetTime))
+            // Reset time or extra usage info (based on metric and format)
+            Text(subtitleText(for: metric, metricData: metricData, usage: usage, format: extraUsageFormat))
                 .font(.system(size: WidgetDesign.Typography.timestamp, weight: .medium))
                 .foregroundColor(secondaryTextColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
         .padding(WidgetDesign.Spacing.cardPadding)
-        .background(cardBackgroundColor)
+        .background(cardBackground)
         .cornerRadius(WidgetDesign.Spacing.cardCornerRadius)
         .frame(maxWidth: .infinity)
     }
@@ -179,6 +179,12 @@ struct UsageCard: View {
                 resetTime: usage.weeklyResetTime,
                 status: statusLevel(for: usage.sonnetPercentage)
             )
+        case .extra:
+            return MetricDisplayData(
+                percentage: usage.extraPercentage ?? 0.0,
+                resetTime: usage.weeklyResetTime,  // Extra usage typically resets weekly
+                status: usage.extraStatusLevel
+            )
         }
     }
 
@@ -193,43 +199,48 @@ struct UsageCard: View {
         }
     }
 
-    // MARK: - Style-dependent colors
+    // MARK: - Colors
 
-    private var cardBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassCardBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardCardBg)
-        }
+    private var cardBackground: some View {
+        // Use very subtle white tint for glass - maintains desktop transparency
+        Color.white.opacity(0.05)
     }
 
     private var progressBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardProgressBg)
-        }
+        Color.white.opacity(0.15)  // Very subtle background for progress track
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
     }
 
     private var statusColor: Color {
-        switch metricData.status {
-        case .safe:
-            return .green
-        case .moderate:
-            return .orange
-        case .critical:
-            return .red
+        return WidgetDataProvider.shared.colorForUsage(
+            metricData.percentage,
+            mode: colorMode,
+            customColorHex: customColorHex
+        )
+    }
+
+    private func subtitleText(for metric: WidgetSmallMetric, metricData: MetricDisplayData, usage: WidgetUsageData, format: ExtraUsageDisplayFormat) -> String {
+        // For non-extra metrics, always show reset time
+        guard metric == .extra else {
+            return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
+        }
+
+        // For extra usage, customize based on format preference
+        switch format {
+        case .percentage:
+            // Show reset time (percentage already in main display)
+            return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
+        case .currency:
+            // Show currency amount
+            return usage.formattedExtraUsed ?? "$0.00"
+        case .both:
+            // Show both currency and reset time
+            let currency = usage.formattedExtraUsed ?? "$0.00"
+            let resetTime = WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
+            return "\(currency) • \(resetTime)"
         }
     }
 }

@@ -10,7 +10,6 @@ import WidgetKit
 
 struct SmallWidgetView: View {
     let entry: UsageEntry
-    let style: WidgetAppearanceStyle
 
     var body: some View {
         if let usage = entry.usage {
@@ -25,16 +24,16 @@ struct SmallWidgetView: View {
                     Circle()
                         .trim(from: 0, to: min(metricData.percentage / 100, 1.0))
                         .stroke(
-                            statusColor(for: metricData.status),
+                            statusColor(for: metricData.percentage),
                             style: StrokeStyle(lineWidth: WidgetDesign.Ring.lineWidth, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
                         .animation(.easeInOut, value: metricData.percentage)
 
                     VStack(spacing: 0) {
-                        Text("\(Int(metricData.percentage))%")
+                        Text("\(Int(metricData.percentage.rounded()))%")
                             .font(.system(size: WidgetDesign.Typography.percentageLarge, weight: .bold, design: .rounded))
-                            .foregroundColor(statusColor(for: metricData.status))
+                            .foregroundColor(statusColor(for: metricData.percentage))
 
                         Text(metricData.label)
                             .font(.system(size: WidgetDesign.Typography.subtitle, weight: .medium))
@@ -43,8 +42,8 @@ struct SmallWidgetView: View {
                 }
                 .frame(width: WidgetDesign.Ring.size, height: WidgetDesign.Ring.size)
 
-                // Reset time (exact format matching menu bar)
-                Text(WidgetDateFormatter.resetTimeString(from: metricData.resetTime))
+                // Reset time or extra usage info (based on metric and format)
+                Text(subtitleText(for: entry.smallMetric, metricData: metricData, usage: usage, format: entry.extraUsageFormat))
                     .font(.system(size: WidgetDesign.Typography.subtitle, weight: .medium))
                     .foregroundColor(secondaryTextColor)
                     .lineLimit(1)
@@ -96,6 +95,13 @@ struct SmallWidgetView: View {
                 status: statusLevel(for: usage.sonnetPercentage),
                 label: "Sonnet"
             )
+        case .extra:
+            return MetricDisplayData(
+                percentage: usage.extraPercentage ?? 0.0,
+                resetTime: usage.weeklyResetTime,  // Extra usage typically resets weekly
+                status: usage.extraStatusLevel,
+                label: "Extra"
+            )
         }
     }
 
@@ -107,6 +113,27 @@ struct SmallWidgetView: View {
             return .moderate
         default:
             return .critical
+        }
+    }
+
+    private func subtitleText(for metric: WidgetSmallMetric, metricData: MetricDisplayData, usage: WidgetUsageData, format: ExtraUsageDisplayFormat) -> String {
+        // For non-extra metrics, always show reset time
+        guard metric == .extra else {
+            return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
+        }
+
+        // For extra usage, customize based on format preference
+        switch format {
+        case .percentage:
+            // Show reset time (percentage already in main display)
+            return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
+        case .currency:
+            // Show currency amount
+            return usage.formattedExtraUsed ?? "$0.00"
+        case .both:
+            // Show both currency and reset time
+            let currency = usage.formattedExtraUsed ?? "$0.00"
+            return currency  // Simplified for small widget (limited space)
         }
     }
 
@@ -134,31 +161,18 @@ struct SmallWidgetView: View {
     // MARK: - Style-dependent colors
 
     private var ringBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(WidgetDesign.Colors.standardProgressBg)
-        }
+        Color.white.opacity(0.15)  // Very subtle background for ring track
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)
     }
 
-    private func statusColor(for level: WidgetStatusLevel) -> Color {
-        switch level {
-        case .safe:
-            return .green
-        case .moderate:
-            return .orange
-        case .critical:
-            return .red
-        }
+    private func statusColor(for percentage: Double) -> Color {
+        return WidgetDataProvider.shared.colorForUsage(
+            percentage,
+            mode: entry.colorMode,
+            customColorHex: entry.customColorHex
+        )
     }
 }

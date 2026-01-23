@@ -50,6 +50,9 @@ enum DesignTokens {
         /// Card padding (16px)
         static let cardPadding: CGFloat = 16
 
+        /// Grid spacing for card layouts (12px)
+        static let gridSpacing: CGFloat = 12
+
         /// Small padding (12px)
         static let medium: CGFloat = 12
 

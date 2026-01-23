@@ -164,6 +164,7 @@
 				05CD2CAF2EA985A100004C83 /* Frameworks */,
 				05CD2CB02EA985A100004C83 /* Resources */,
 				FC125E852F221069003CB106 /* Embed Foundation Extensions */,
+				FCDCBF022F22C4C300E5B9C6 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -302,6 +303,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FCDCBF022F22C4C300E5B9C6 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Kill stale widget extension process so it restarts with new code\npkill -f \"Claude Usage WidgetExtension\" 2>/dev/null || true\nkillall \"Notification Center\" 2>/dev/null || true\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		05CD2CAE2EA985A100004C83 /* Sources */ = {

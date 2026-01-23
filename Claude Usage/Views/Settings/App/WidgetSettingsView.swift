@@ -49,12 +49,18 @@ private enum PreviewDesign {
 
 /// Widget appearance and style settings
 struct WidgetSettingsView: View {
-    @State private var selectedStyle: WidgetStyle = SharedDataStore.shared.loadWidgetStyle()
+    @ObservedObject private var profileManager = ProfileManager.shared
     @State private var selectedSmallMetric: SmallWidgetMetric = SharedDataStore.shared.loadSmallWidgetMetric()
-    @State private var selectedMediumLayout: MediumWidgetLayout = SharedDataStore.shared.loadMediumWidgetLayout()
     @State private var selectedColorMode: WidgetColorMode = SharedDataStore.shared.loadWidgetColorMode()
     @State private var singleColor: Color = Color(hex: SharedDataStore.shared.loadWidgetSingleColorHex()) ?? .cyan
     @State private var extraUsageFormat: ExtraUsageDisplayFormat = SharedDataStore.shared.loadExtraUsageDisplayFormat()
+
+    // Medium widget individual metric selection
+    @State private var mediumLeftMetric: SmallWidgetMetric = SharedDataStore.shared.loadMediumWidgetLeftMetric()
+    @State private var mediumRightMetric: SmallWidgetMetric = SharedDataStore.shared.loadMediumWidgetRightMetric()
+
+    // Actual usage data for previews
+    @State private var previewUsage: ClaudeUsage?
 
     var body: some View {
         ScrollView {
@@ -65,243 +71,291 @@ struct WidgetSettingsView: View {
                     subtitle: "Customize the appearance and content of your desktop widgets"
                 )
 
-                // Appearance & Colors - Two cards side by side
-                HStack(alignment: .top, spacing: DesignTokens.Spacing.gridSpacing) {
-                    // Left: Appearance Style
-                    SettingsSectionCard(
-                        title: "Appearance Style",
-                        subtitle: "Choose how your widgets look"
-                    ) {
-                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.cardPadding) {
-                            ForEach(WidgetStyle.allCases, id: \.self) { style in
-                                StyleOptionRow(
-                                    style: style,
-                                    isSelected: selectedStyle == style,
-                                    onSelect: {
-                                        selectedStyle = style
-                                        saveStyle(style)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Right: Widget Colors
-                    SettingsSectionCard(
-                        title: "Widget Colors",
-                        subtitle: "Choose color display mode"
-                    ) {
-                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                            ForEach([WidgetColorMode.multiColor, .monochrome, .singleColor], id: \.self) { mode in
-                                Button {
-                                    selectedColorMode = mode
-                                    saveColorMode(mode)
-                                } label: {
-                                    HStack {
-                                        Image(systemName: selectedColorMode == mode ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(selectedColorMode == mode ? .accentColor : .secondary)
-
-                                        Image(systemName: mode.icon)
-                                            .font(.system(size: 14))
-                                            .foregroundColor(iconColorForMode(mode))
-                                            .frame(width: 20)
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(mode.displayName)
-                                                .font(DesignTokens.Typography.body)
-                                                .foregroundColor(.primary)
-
-                                            Text(mode.description)
-                                                .font(DesignTokens.Typography.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            // Conditional ColorPicker for single-color mode
-                            if selectedColorMode == .singleColor {
-                                HStack {
-                                    Spacer().frame(width: 20)
-
-                                    ColorPicker("Choose Color", selection: Binding(
-                                        get: { singleColor },
-                                        set: { newColor in
-                                            singleColor = newColor
-                                            SharedDataStore.shared.saveWidgetSingleColorHex(newColor.toHex() ?? "#00BFFF")
-                                            refreshWidgets()
-                                        }
-                                    ))
-                                    .labelsHidden()
-
-                                    Text("Custom widget color")
-                                        .font(DesignTokens.Typography.caption)
-                                        .foregroundColor(.secondary)
-
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                // Small Widget Content - Preview on left, options on right
-                SettingsSectionCard(
-                    title: "Small Widget",
-                    subtitle: "Choose which metric to display"
-                ) {
-                    HStack(alignment: .top, spacing: 16) {
-                        // Live preview on left
-                        SmallWidgetPreview(
-                            style: selectedStyle,
-                            metric: selectedSmallMetric,
-                            colorMode: selectedColorMode,
-                            customColor: singleColor
-                        )
-
-                        // Options on right
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(SmallWidgetMetric.allCases, id: \.self) { metric in
-                                MetricOptionRow(
-                                    metric: metric,
-                                    isSelected: selectedSmallMetric == metric,
-                                    onSelect: {
-                                        selectedSmallMetric = metric
-                                        saveSmallMetric(metric)
-                                    }
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
-                // Medium Widget Layout - Preview above, options below
-                SettingsSectionCard(
-                    title: "Medium Widget",
-                    subtitle: "Choose which two metrics to display"
-                ) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Live preview centered above
-                        MediumWidgetPreview(
-                            style: selectedStyle,
-                            layout: selectedMediumLayout,
-                            colorMode: selectedColorMode,
-                            customColor: singleColor
-                        )
-                        .frame(maxWidth: .infinity)
-
-                        // Options below
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(MediumWidgetLayout.allCases, id: \.self) { layout in
-                                LayoutOptionRow(
-                                    layout: layout,
-                                    isSelected: selectedMediumLayout == layout,
-                                    onSelect: {
-                                        selectedMediumLayout = layout
-                                        saveMediumLayout(layout)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Extra Usage Display Format
-                SettingsSectionCard(
-                    title: "Extra Usage Format",
-                    subtitle: "Choose how to display cost-based usage"
-                ) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach([ExtraUsageDisplayFormat.percentage, .currency, .both], id: \.self) { format in
-                            Button {
-                                extraUsageFormat = format
-                                saveExtraUsageFormat(format)
-                            } label: {
-                                HStack {
-                                    Image(systemName: extraUsageFormat == format ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(extraUsageFormat == format ? .accentColor : .secondary)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(format.displayName)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.primary)
-
-                                        Text(format.description)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Spacer()
-                                }
-                                .padding(.vertical, 6)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                // Widget Info
-                SettingsSectionCard(
-                    title: "About Widgets",
-                    subtitle: "How to add widgets to your desktop"
-                ) {
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                        InfoRow(
-                            icon: "plus.rectangle.on.rectangle",
-                            title: "Add Widget",
-                            description: "Right-click on your desktop and select \"Edit Widgets\" to add Claude Usage widgets"
-                        )
-
-                        Divider()
-
-                        InfoRow(
-                            icon: "square.resize",
-                            title: "Widget Sizes",
-                            description: "Available in small (single metric), medium (two metrics), and large (full dashboard) sizes"
-                        )
-
-                        Divider()
-
-                        InfoRow(
-                            icon: "arrow.clockwise",
-                            title: "Refresh Rate",
-                            description: "Widgets update automatically every 15 minutes, or when you open the app"
-                        )
-                    }
-                }
+                formatAndColorSection
+                smallWidgetSection
+                mediumWidgetSection
+                aboutWidgetsSection
 
                 Spacer()
             }
             .padding()
         }
+        .onAppear {
+            // Load actual usage data for previews
+            if let activeProfile = profileManager.activeProfile {
+                previewUsage = activeProfile.claudeUsage
+            }
+        }
+        .onChange(of: profileManager.activeProfile?.claudeUsage) { _, newUsage in
+            // Update preview when usage changes
+            previewUsage = newUsage
+        }
+    }
+
+    // MARK: - View Sections
+
+    private var formatAndColorSection: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: DesignTokens.Spacing.gridSpacing),
+            GridItem(.flexible(), spacing: DesignTokens.Spacing.gridSpacing)
+        ], spacing: DesignTokens.Spacing.gridSpacing) {
+            extraUsageFormatCard
+            widgetColorsCard
+        }
+    }
+
+    private var extraUsageFormatCard: some View {
+        SettingsSectionCard(
+            title: "Extra Usage Format",
+            subtitle: "Choose how to display cost-based usage"
+        ) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach([ExtraUsageDisplayFormat.percentage, .currency, .both], id: \.self) { format in
+                    Button {
+                        extraUsageFormat = format
+                        saveExtraUsageFormat(format)
+                    } label: {
+                        HStack {
+                            Image(systemName: extraUsageFormat == format ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(extraUsageFormat == format ? .accentColor : .secondary)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(format.displayName)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.primary)
+
+                                Text(format.description)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var widgetColorsCard: some View {
+        SettingsSectionCard(
+            title: "Widget Colors",
+            subtitle: "Choose color display mode"
+        ) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
+                ForEach([WidgetColorMode.multiColor, .monochrome, .singleColor], id: \.self) { mode in
+                    Button {
+                        selectedColorMode = mode
+                        saveColorMode(mode)
+                    } label: {
+                        HStack {
+                            Image(systemName: selectedColorMode == mode ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(selectedColorMode == mode ? .accentColor : .secondary)
+
+                            Image(systemName: mode.icon)
+                                .font(.system(size: 14))
+                                .foregroundColor(iconColorForMode(mode))
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName)
+                                    .font(DesignTokens.Typography.body)
+                                    .foregroundColor(.primary)
+
+                                Text(mode.description)
+                                    .font(DesignTokens.Typography.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if selectedColorMode == .singleColor {
+                    colorPickerRow
+                }
+            }
+        }
+    }
+
+    private var colorPickerRow: some View {
+        HStack {
+            Spacer().frame(width: 20)
+
+            ColorPicker("Choose Color", selection: Binding(
+                get: { singleColor },
+                set: { newColor in
+                    singleColor = newColor
+                    SharedDataStore.shared.saveWidgetSingleColorHex(newColor.toHex() ?? "#00BFFF")
+                    refreshWidgets()
+                }
+            ))
+            .labelsHidden()
+
+            Text("Custom widget color")
+                .font(DesignTokens.Typography.caption)
+                .foregroundColor(.secondary)
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var smallWidgetSection: some View {
+        SettingsSectionCard(
+            title: "Small Widget",
+            subtitle: "Choose which metric to display"
+        ) {
+            HStack(alignment: .top, spacing: 16) {
+                SmallWidgetPreview(
+                    metric: selectedSmallMetric,
+                    colorMode: selectedColorMode,
+                    customColor: singleColor,
+                    usage: previewUsage
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(SmallWidgetMetric.allCases, id: \.self) { metric in
+                        MetricOptionRow(
+                            metric: metric,
+                            isSelected: selectedSmallMetric == metric,
+                            onSelect: {
+                                selectedSmallMetric = metric
+                                saveSmallMetric(metric)
+                            }
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var mediumWidgetSection: some View {
+        SettingsSectionCard(
+            title: "Medium Widget",
+            subtitle: "Choose which two metrics to display"
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                MediumWidgetPreview(
+                    leftMetric: mediumLeftMetric,
+                    rightMetric: mediumRightMetric,
+                    colorMode: selectedColorMode,
+                    customColor: singleColor,
+                    usage: previewUsage
+                )
+                .frame(maxWidth: .infinity)
+
+                mediumMetricPickers
+            }
+        }
+    }
+
+    private var mediumMetricPickers: some View {
+        HStack(spacing: 12) {
+            metricPicker(
+                title: "Left Metric",
+                selectedMetric: mediumLeftMetric,
+                onSelect: { metric in
+                    mediumLeftMetric = metric
+                    updateMediumLayout()
+                }
+            )
+
+            metricPicker(
+                title: "Right Metric",
+                selectedMetric: mediumRightMetric,
+                onSelect: { metric in
+                    mediumRightMetric = metric
+                    updateMediumLayout()
+                }
+            )
+        }
+    }
+
+    private func metricPicker(title: String, selectedMetric: SmallWidgetMetric, onSelect: @escaping (SmallWidgetMetric) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.secondary)
+
+            Menu {
+                ForEach(SmallWidgetMetric.allCases, id: \.self) { metric in
+                    Button {
+                        onSelect(metric)
+                    } label: {
+                        HStack {
+                            Image(systemName: metric.icon)
+                            Text(metric.displayName)
+                            if selectedMetric == metric {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: selectedMetric.icon)
+                        .font(.system(size: 12))
+                        .foregroundColor(metricColor(selectedMetric))
+                        .frame(width: 16)
+                    Text(selectedMetric.displayName)
+                        .font(.system(size: 13))
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var aboutWidgetsSection: some View {
+        SettingsSectionCard(
+            title: "About Widgets",
+            subtitle: "How to add widgets to your desktop"
+        ) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
+                InfoRow(
+                    icon: "plus.rectangle.on.rectangle",
+                    title: "Add Widget",
+                    description: "Right-click on your desktop and select \"Edit Widgets\" to add Claude Usage widgets"
+                )
+
+                Divider()
+
+                InfoRow(
+                    icon: "square.resize",
+                    title: "Widget Sizes",
+                    description: "Available in small (single metric), medium (two metrics), and large (full dashboard) sizes"
+                )
+
+                Divider()
+
+                InfoRow(
+                    icon: "arrow.clockwise",
+                    title: "Refresh Rate",
+                    description: "Widgets refresh instantly when the app is active, or automatically every 15 minutes when the app is closed"
+                )
+            }
+        }
     }
 
     // MARK: - Save Methods
-
-    private func saveStyle(_ style: WidgetStyle) {
-        SharedDataStore.shared.saveWidgetStyle(style)
-        refreshWidgets()
-        LoggingService.shared.log("Widget style changed to: \(style.displayName)")
-    }
 
     private func saveSmallMetric(_ metric: SmallWidgetMetric) {
         SharedDataStore.shared.saveSmallWidgetMetric(metric)
         refreshWidgets()
         LoggingService.shared.log("Small widget metric changed to: \(metric.displayName)")
-    }
-
-    private func saveMediumLayout(_ layout: MediumWidgetLayout) {
-        SharedDataStore.shared.saveMediumWidgetLayout(layout)
-        refreshWidgets()
-        LoggingService.shared.log("Medium widget layout changed to: \(layout.displayName)")
     }
 
     private func saveColorMode(_ mode: WidgetColorMode) {
@@ -327,92 +381,36 @@ struct WidgetSettingsView: View {
         }
     }
 
+    /// Returns color for a given metric
+    private func metricColor(_ metric: SmallWidgetMetric) -> Color {
+        switch metric {
+        case .session:
+            return .green
+        case .weekly:
+            return .blue
+        case .opus:
+            return .purple
+        case .sonnet:
+            return .orange
+        case .extra:
+            return .cyan
+        }
+    }
+
+    /// Saves medium widget metrics when selection changes
+    private func updateMediumLayout() {
+        SharedDataStore.shared.saveMediumWidgetLeftMetric(mediumLeftMetric)
+        SharedDataStore.shared.saveMediumWidgetRightMetric(mediumRightMetric)
+        refreshWidgets()
+        LoggingService.shared.log("Medium widget metrics changed to: \(mediumLeftMetric.displayName) + \(mediumRightMetric.displayName)")
+    }
+
     private func refreshWidgets() {
         if #available(macOS 14.0, *) {
             // Small delay to ensure UserDefaults sync propagates across processes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 WidgetCenter.shared.reloadAllTimelines()
             }
-        }
-    }
-}
-
-// MARK: - Style Option Row
-
-private struct StyleOptionRow: View {
-    let style: WidgetStyle
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                // Style preview icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(previewBackground)
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: previewIcon)
-                        .font(.system(size: 20))
-                        .foregroundColor(previewIconColor)
-                }
-
-                // Style info
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(style.displayName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.primary)
-
-                    Text(style.description)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                // Selection indicator
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18))
-                    .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.5))
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.3) : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var previewBackground: Color {
-        switch style {
-        case .standard:
-            return Color.gray.opacity(0.15)
-        case .glass:
-            return Color.blue.opacity(0.08)
-        }
-    }
-
-    private var previewIcon: String {
-        switch style {
-        case .standard:
-            return "square.fill"
-        case .glass:
-            return "square.on.square.dashed"
-        }
-    }
-
-    private var previewIconColor: Color {
-        switch style {
-        case .standard:
-            return .secondary
-        case .glass:
-            return .blue
         }
     }
 }
@@ -468,63 +466,6 @@ private struct MetricOptionRow: View {
     }
 }
 
-// MARK: - Layout Option Row (Compact)
-
-private struct LayoutOptionRow: View {
-    let layout: MediumWidgetLayout
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 10) {
-                // Compact metric pair indicator (colored dots)
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(metricColor(for: layout.leftMetric))
-                        .frame(width: 10, height: 10)
-                    Circle()
-                        .fill(metricColor(for: layout.rightMetric))
-                        .frame(width: 10, height: 10)
-                }
-                .frame(width: 28)
-
-                Text(layout.displayName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16))
-                    .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.5))
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func metricColor(for metric: SmallWidgetMetric) -> Color {
-        switch metric {
-        case .session:
-            return .green
-        case .weekly:
-            return .blue
-        case .opus:
-            return .purple
-        case .sonnet:
-            return .orange
-        case .extra:
-            return .cyan
-        }
-    }
-}
-
 // MARK: - Info Row
 
 private struct InfoRow: View {
@@ -557,14 +498,34 @@ private struct InfoRow: View {
 // MARK: - Small Widget Preview
 
 private struct SmallWidgetPreview: View {
-    let style: WidgetStyle
     let metric: SmallWidgetMetric
     let colorMode: WidgetColorMode
     let customColor: Color
+    let usage: ClaudeUsage?
 
-    // Sample preview data
-    private let previewPercentage: Double = 45.0
-    private let previewResetTime = Date().addingTimeInterval(3600 * 2)  // 2 hours from now
+    // Computed data from real usage or fallback to sample
+    private var previewPercentage: Double {
+        guard let usage = usage else { return 45.0 }
+        switch metric {
+        case .session: return usage.sessionPercentage
+        case .weekly: return usage.weeklyPercentage
+        case .opus: return usage.opusWeeklyPercentage
+        case .sonnet: return usage.sonnetWeeklyPercentage
+        case .extra:
+            if let used = usage.costUsed, let limit = usage.costLimit, limit > 0 {
+                return (used / limit) * 100.0
+            }
+            return 0.0
+        }
+    }
+
+    private var previewResetTime: Date {
+        guard let usage = usage else { return Date().addingTimeInterval(3600 * 2) }
+        switch metric {
+        case .session: return usage.sessionResetTime
+        case .weekly, .opus, .sonnet, .extra: return usage.weeklyResetTime
+        }
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -606,21 +567,11 @@ private struct SmallWidgetPreview: View {
     }
 
     private var ringBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(PreviewDesign.Colors.standardProgressBg)
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassProgressBg)
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
     }
 
     private var statusColor: Color {
@@ -628,16 +579,8 @@ private struct SmallWidgetPreview: View {
     }
 
     private var previewBackground: some View {
-        Group {
-            switch style {
-            case .glass:
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            case .standard:
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(NSColor.windowBackgroundColor).opacity(0.8))
-            }
-        }
+        RoundedRectangle(cornerRadius: 16)
+            .fill(.ultraThinMaterial)
     }
 
     private func formatResetTime(_ date: Date) -> String {
@@ -650,10 +593,11 @@ private struct SmallWidgetPreview: View {
 // MARK: - Medium Widget Preview
 
 private struct MediumWidgetPreview: View {
-    let style: WidgetStyle
-    let layout: MediumWidgetLayout
+    let leftMetric: SmallWidgetMetric
+    let rightMetric: SmallWidgetMetric
     let colorMode: WidgetColorMode
     let customColor: Color
+    let usage: ClaudeUsage?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -673,16 +617,14 @@ private struct MediumWidgetPreview: View {
             // Usage cards
             HStack(spacing: 10) {
                 PreviewUsageCard(
-                    metric: layout.leftMetric,
-                    percentage: percentageFor(layout.leftMetric),
-                    style: style,
+                    metric: leftMetric,
+                    percentage: percentageFor(leftMetric),
                     colorMode: colorMode,
                     customColor: customColor
                 )
                 PreviewUsageCard(
-                    metric: layout.rightMetric,
-                    percentage: percentageFor(layout.rightMetric),
-                    style: style,
+                    metric: rightMetric,
+                    percentage: percentageFor(rightMetric),
                     colorMode: colorMode,
                     customColor: customColor
                 )
@@ -695,35 +637,38 @@ private struct MediumWidgetPreview: View {
     }
 
     private func percentageFor(_ metric: SmallWidgetMetric) -> Double {
+        guard let usage = usage else {
+            // Fallback to sample data
+            switch metric {
+            case .session: return 45.0
+            case .weekly: return 32.0
+            case .opus: return 28.0
+            case .sonnet: return 35.0
+            case .extra: return 22.5
+            }
+        }
+
+        // Use real data
         switch metric {
-        case .session: return 45.0
-        case .weekly: return 32.0
-        case .opus: return 28.0
-        case .sonnet: return 35.0
-        case .extra: return 22.5
+        case .session: return usage.sessionPercentage
+        case .weekly: return usage.weeklyPercentage
+        case .opus: return usage.opusWeeklyPercentage
+        case .sonnet: return usage.sonnetWeeklyPercentage
+        case .extra:
+            if let used = usage.costUsed, let limit = usage.costLimit, limit > 0 {
+                return (used / limit) * 100.0
+            }
+            return 0.0
         }
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
     }
 
     private var previewBackground: some View {
-        Group {
-            switch style {
-            case .glass:
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            case .standard:
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(NSColor.windowBackgroundColor).opacity(0.8))
-            }
-        }
+        RoundedRectangle(cornerRadius: 16)
+            .fill(.ultraThinMaterial)
     }
 }
 
@@ -732,7 +677,6 @@ private struct MediumWidgetPreview: View {
 private struct PreviewUsageCard: View {
     let metric: SmallWidgetMetric
     let percentage: Double
-    let style: WidgetStyle
     let colorMode: WidgetColorMode
     let customColor: Color
 
@@ -779,30 +723,15 @@ private struct PreviewUsageCard: View {
     }
 
     private var cardBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassCardBg)
-        case .standard:
-            return Color.gray.opacity(PreviewDesign.Colors.standardCardBg)
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassCardBg)
     }
 
     private var progressBackgroundColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassProgressBg)
-        case .standard:
-            return Color.gray.opacity(PreviewDesign.Colors.standardProgressBg)
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassProgressBg)
     }
 
     private var secondaryTextColor: Color {
-        switch style {
-        case .glass:
-            return Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
-        case .standard:
-            return Color.secondary
-        }
+        Color.primary.opacity(PreviewDesign.Colors.glassSecondaryText)
     }
 
     private var statusColor: Color {
@@ -816,16 +745,14 @@ private struct PreviewUsageCard: View {
 private func colorForUsage(_ percentage: Double, mode: WidgetColorMode, customColor: Color) -> Color {
     switch mode {
     case .multiColor:
-        // Threshold-based colors (like menu bar)
+        // Threshold-based colors (matching menu bar)
         switch percentage {
-        case 90...:
-            return SettingsColors.usageCritical  // Red
-        case 75..<90:
-            return SettingsColors.usageHigh      // Orange
-        case 50..<75:
-            return SettingsColors.usageMedium    // Yellow
-        default:
+        case 0..<50:
             return SettingsColors.usageLow       // Green
+        case 50..<80:
+            return SettingsColors.usageHigh      // Orange
+        default: // 80%+
+            return SettingsColors.usageCritical  // Red
         }
     case .monochrome:
         return .primary  // Adaptive to system theme

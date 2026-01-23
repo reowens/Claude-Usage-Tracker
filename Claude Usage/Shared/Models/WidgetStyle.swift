@@ -2,34 +2,101 @@
 //  WidgetStyle.swift
 //  Claude Usage
 //
-//  Widget appearance style options
+//  Widget and statusline appearance style options
 //
 
 import Foundation
 
-/// Widget appearance style
-enum WidgetStyle: String, Codable, CaseIterable {
-    /// Standard opaque background
-    case standard = "standard"
+// MARK: - Statusline Color Mode
 
-    /// Glass/translucent style with vibrancy
-    case glass = "glass"
+/// Statusline color mode for Claude Code integration
+enum StatuslineColorMode: String, Codable, CaseIterable {
+    /// Multi-colored elements (default terminal colors)
+    case colored = "colored"
+
+    /// Monochrome/adaptive (uses terminal's default text color)
+    case monochrome = "monochrome"
+
+    /// Single user-selected color for all elements
+    case singleColor = "singleColor"
 
     var displayName: String {
         switch self {
-        case .standard:
-            return "Standard"
-        case .glass:
-            return "Glass"
+        case .colored:
+            return "Multi-Color"
+        case .monochrome:
+            return "Monochrome"
+        case .singleColor:
+            return "Single Color"
         }
     }
 
     var description: String {
         switch self {
-        case .standard:
-            return "Classic solid background"
-        case .glass:
-            return "Translucent with desktop blur"
+        case .colored:
+            return "Threshold-based colors by usage level"
+        case .monochrome:
+            return "Adapts to system theme"
+        case .singleColor:
+            return "Custom color for all elements"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .colored:
+            return "paintpalette.fill"
+        case .monochrome:
+            return "circle.lefthalf.filled"
+        case .singleColor:
+            return "eyedropper.halffull"
+        }
+    }
+}
+
+// MARK: - Widget Color Mode
+
+/// Widget color display mode
+enum WidgetColorMode: String, Codable, CaseIterable {
+    /// Multi-colored elements (threshold-based)
+    case multiColor = "multiColor"
+
+    /// Monochrome/adaptive (uses system theme)
+    case monochrome = "monochrome"
+
+    /// Single user-selected color for all elements
+    case singleColor = "singleColor"
+
+    var displayName: String {
+        switch self {
+        case .multiColor:
+            return "Multi-Color"
+        case .monochrome:
+            return "Monochrome"
+        case .singleColor:
+            return "Single Color"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .multiColor:
+            return "Threshold-based colors by usage level"
+        case .monochrome:
+            return "Adapts to system theme"
+        case .singleColor:
+            return "Custom color for all elements"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .multiColor:
+            return "paintpalette.fill"
+        case .monochrome:
+            return "circle.lefthalf.filled"
+        case .singleColor:
+            return "eyedropper.halffull"
         }
     }
 }
@@ -42,6 +109,7 @@ enum SmallWidgetMetric: String, Codable, CaseIterable {
     case weekly = "weekly"
     case opus = "opus"
     case sonnet = "sonnet"
+    case extra = "extra"
 
     var displayName: String {
         switch self {
@@ -53,6 +121,8 @@ enum SmallWidgetMetric: String, Codable, CaseIterable {
             return "Opus"
         case .sonnet:
             return "Sonnet"
+        case .extra:
+            return "Extra"
         }
     }
 
@@ -66,57 +136,40 @@ enum SmallWidgetMetric: String, Codable, CaseIterable {
             return "star.fill"
         case .sonnet:
             return "bolt.fill"
+        case .extra:
+            return "dollarsign.circle.fill"
         }
     }
 }
 
-// MARK: - Medium Widget Layout
+// MARK: - Extra Usage Display Format
 
-/// Medium widget metric pair selection - determines which two metrics are displayed side by side
-enum MediumWidgetLayout: String, Codable, CaseIterable {
-    case sessionWeekly = "session_weekly"
-    case sessionOpus = "session_opus"
-    case sessionSonnet = "session_sonnet"
-    case weeklyOpus = "weekly_opus"
-    case weeklySonnet = "weekly_sonnet"
-    case opusSonnet = "opus_sonnet"
+/// Extra usage display format - determines how extra usage is shown
+enum ExtraUsageDisplayFormat: String, Codable, CaseIterable {
+    case percentage = "percentage"
+    case currency = "currency"
+    case both = "both"
 
     var displayName: String {
         switch self {
-        case .sessionWeekly:
-            return "Session + Weekly"
-        case .sessionOpus:
-            return "Session + Opus"
-        case .sessionSonnet:
-            return "Session + Sonnet"
-        case .weeklyOpus:
-            return "Weekly + Opus"
-        case .weeklySonnet:
-            return "Weekly + Sonnet"
-        case .opusSonnet:
-            return "Opus + Sonnet"
+        case .percentage:
+            return "Percentage"
+        case .currency:
+            return "Currency Amount"
+        case .both:
+            return "Both"
         }
     }
 
-    var leftMetric: SmallWidgetMetric {
+    var description: String {
         switch self {
-        case .sessionWeekly, .sessionOpus, .sessionSonnet:
-            return .session
-        case .weeklyOpus, .weeklySonnet:
-            return .weekly
-        case .opusSonnet:
-            return .opus
-        }
-    }
-
-    var rightMetric: SmallWidgetMetric {
-        switch self {
-        case .sessionWeekly:
-            return .weekly
-        case .sessionOpus, .weeklyOpus:
-            return .opus
-        case .sessionSonnet, .weeklySonnet, .opusSonnet:
-            return .sonnet
+        case .percentage:
+            return "Show as percentage (e.g., 22%)"
+        case .currency:
+            return "Show as currency amount (e.g., $2.25)"
+        case .both:
+            return "Show both values"
         }
     }
 }
+

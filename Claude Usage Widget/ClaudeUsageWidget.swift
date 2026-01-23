@@ -14,7 +14,7 @@ struct ClaudeUsageWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: UsageTimelineProvider()) { entry in
             ClaudeUsageWidgetEntryView(entry: entry)
-                .widgetContainerBackground(style: entry.style)
+                .containerBackground(.ultraThinMaterial, for: .widget)
         }
         .configurationDisplayName("Claude Usage")
         .description("Monitor your Claude AI usage at a glance.")
@@ -22,25 +22,10 @@ struct ClaudeUsageWidget: Widget {
     }
 }
 
-// MARK: - Container Background Extension
-
-extension View {
-    @ViewBuilder
-    func widgetContainerBackground(style: WidgetAppearanceStyle) -> some View {
-        switch style {
-        case .glass:
-            // Glass style: balanced translucency with blur
-            self.containerBackground(.regularMaterial, for: .widget)
-        case .standard:
-            // Standard style: solid background
-            self.containerBackground(.fill.tertiary, for: .widget)
-        }
-    }
-}
 
 struct UsageTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> UsageEntry {
-        UsageEntry(date: Date(), usage: nil, apiUsage: nil, style: .standard)
+        UsageEntry(date: Date(), usage: nil, apiUsage: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void) {
@@ -49,9 +34,12 @@ struct UsageTimelineProvider: TimelineProvider {
             date: Date(),
             usage: provider.loadUsage(),
             apiUsage: provider.loadAPIUsage(),
-            style: provider.loadWidgetStyle(),
             smallMetric: provider.loadSmallWidgetMetric(),
-            mediumLayout: provider.loadMediumWidgetLayout()
+            mediumLeftMetric: provider.loadMediumWidgetLeftMetric(),
+            mediumRightMetric: provider.loadMediumWidgetRightMetric(),
+            colorMode: provider.loadWidgetColorMode(),
+            customColorHex: provider.loadWidgetSingleColorHex(),
+            extraUsageFormat: provider.loadExtraUsageDisplayFormat()
         )
         completion(entry)
     }
@@ -63,9 +51,12 @@ struct UsageTimelineProvider: TimelineProvider {
             date: currentDate,
             usage: provider.loadUsage(),
             apiUsage: provider.loadAPIUsage(),
-            style: provider.loadWidgetStyle(),
             smallMetric: provider.loadSmallWidgetMetric(),
-            mediumLayout: provider.loadMediumWidgetLayout()
+            mediumLeftMetric: provider.loadMediumWidgetLeftMetric(),
+            mediumRightMetric: provider.loadMediumWidgetRightMetric(),
+            colorMode: provider.loadWidgetColorMode(),
+            customColorHex: provider.loadWidgetSingleColorHex(),
+            extraUsageFormat: provider.loadExtraUsageDisplayFormat()
         )
 
         // Refresh every 15 minutes
@@ -79,24 +70,33 @@ struct UsageEntry: TimelineEntry {
     let date: Date
     let usage: WidgetUsageData?
     let apiUsage: WidgetAPIUsageData?
-    let style: WidgetAppearanceStyle
     let smallMetric: WidgetSmallMetric
-    let mediumLayout: WidgetMediumLayout
+    let mediumLeftMetric: WidgetSmallMetric
+    let mediumRightMetric: WidgetSmallMetric
+    let colorMode: WidgetColorDisplayMode
+    let customColorHex: String
+    let extraUsageFormat: ExtraUsageDisplayFormat
 
     init(
         date: Date,
         usage: WidgetUsageData?,
         apiUsage: WidgetAPIUsageData?,
-        style: WidgetAppearanceStyle = .standard,
         smallMetric: WidgetSmallMetric = .session,
-        mediumLayout: WidgetMediumLayout = .sessionWeekly
+        mediumLeftMetric: WidgetSmallMetric = .session,
+        mediumRightMetric: WidgetSmallMetric = .weekly,
+        colorMode: WidgetColorDisplayMode = .multiColor,
+        customColorHex: String = "#00BFFF",
+        extraUsageFormat: ExtraUsageDisplayFormat = .percentage
     ) {
         self.date = date
         self.usage = usage
         self.apiUsage = apiUsage
-        self.style = style
         self.smallMetric = smallMetric
-        self.mediumLayout = mediumLayout
+        self.mediumLeftMetric = mediumLeftMetric
+        self.mediumRightMetric = mediumRightMetric
+        self.colorMode = colorMode
+        self.customColorHex = customColorHex
+        self.extraUsageFormat = extraUsageFormat
     }
 }
 
@@ -108,13 +108,13 @@ struct ClaudeUsageWidgetEntryView: View {
         Group {
             switch family {
             case .systemSmall:
-                SmallWidgetView(entry: entry, style: entry.style)
+                SmallWidgetView(entry: entry)
             case .systemMedium:
-                MediumWidgetView(entry: entry, style: entry.style)
+                MediumWidgetView(entry: entry)
             case .systemLarge:
-                LargeWidgetView(entry: entry, style: entry.style)
+                LargeWidgetView(entry: entry)
             default:
-                SmallWidgetView(entry: entry, style: entry.style)
+                SmallWidgetView(entry: entry)
             }
         }
     }

@@ -384,14 +384,12 @@ struct ClaudeCodeView: View {
     /// Returns the appropriate color for usage percentage based on thresholds
     private func colorForPercentage(_ percentage: Double) -> Color {
         switch percentage {
-        case 90...:
-            return SettingsColors.usageCritical  // Red
-        case 75..<90:
-            return SettingsColors.usageHigh      // Orange
-        case 50..<75:
-            return SettingsColors.usageMedium    // Yellow
-        default:
+        case 0..<50:
             return SettingsColors.usageLow       // Green
+        case 50..<80:
+            return SettingsColors.usageHigh      // Orange
+        default: // 80%+
+            return SettingsColors.usageCritical  // Red
         }
     }
 

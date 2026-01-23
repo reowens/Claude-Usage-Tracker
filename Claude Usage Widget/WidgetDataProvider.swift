@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// Lightweight usage data structure for widget display
 struct WidgetUsageData: Codable {
@@ -15,6 +16,10 @@ struct WidgetUsageData: Codable {
     let weeklyResetTime: Date
     let opusPercentage: Double
     let sonnetPercentage: Double
+    let extraPercentage: Double?
+    let extraUsed: Double?
+    let extraLimit: Double?
+    let extraCurrency: String?
     let lastUpdated: Date
 
     var statusLevel: WidgetStatusLevel {
@@ -39,6 +44,37 @@ struct WidgetUsageData: Codable {
         }
     }
 
+    var extraStatusLevel: WidgetStatusLevel {
+        guard let percentage = extraPercentage else { return .safe }
+        switch percentage {
+        case 0..<50:
+            return .safe
+        case 50..<80:
+            return .moderate
+        default:
+            return .critical
+        }
+    }
+
+    var formattedExtraUsed: String? {
+        guard let used = extraUsed, let currency = extraCurrency else { return nil }
+        return formatCurrency(used, currency: currency)
+    }
+
+    var formattedExtraLimit: String? {
+        guard let limit = extraLimit, let currency = extraCurrency else { return nil }
+        return formatCurrency(limit, currency: currency)
+    }
+
+    private func formatCurrency(_ amount: Double, currency: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(currency) \(String(format: "%.2f", amount))"
+    }
+
     static var preview: WidgetUsageData {
         WidgetUsageData(
             sessionPercentage: 45.0,
@@ -47,6 +83,10 @@ struct WidgetUsageData: Codable {
             weeklyResetTime: Date().addingTimeInterval(86400 * 3),
             opusPercentage: 28.0,
             sonnetPercentage: 35.0,
+            extraPercentage: 22.5,
+            extraUsed: 2.25,
+            extraLimit: 10.0,
+            extraCurrency: "USD",
             lastUpdated: Date()
         )
     }
@@ -106,6 +146,7 @@ enum WidgetSmallMetric: String {
     case weekly = "weekly"
     case opus = "opus"
     case sonnet = "sonnet"
+    case extra = "extra"
 
     var displayName: String {
         switch self {
@@ -113,6 +154,7 @@ enum WidgetSmallMetric: String {
         case .weekly: return "Weekly"
         case .opus: return "Opus"
         case .sonnet: return "Sonnet"
+        case .extra: return "Extra"
         }
     }
 
@@ -122,6 +164,7 @@ enum WidgetSmallMetric: String {
         case .weekly: return "calendar"
         case .opus: return "star.fill"
         case .sonnet: return "bolt.fill"
+        case .extra: return "dollarsign.circle.fill"
         }
     }
 }
@@ -131,15 +174,20 @@ enum WidgetMediumLayout: String {
     case sessionWeekly = "session_weekly"
     case sessionOpus = "session_opus"
     case sessionSonnet = "session_sonnet"
+    case sessionExtra = "session_extra"
     case weeklyOpus = "weekly_opus"
     case weeklySonnet = "weekly_sonnet"
+    case weeklyExtra = "weekly_extra"
     case opusSonnet = "opus_sonnet"
+    case opusExtra = "opus_extra"
+    case sonnetExtra = "sonnet_extra"
 
     var leftMetric: WidgetSmallMetric {
         switch self {
-        case .sessionWeekly, .sessionOpus, .sessionSonnet: return .session
-        case .weeklyOpus, .weeklySonnet: return .weekly
-        case .opusSonnet: return .opus
+        case .sessionWeekly, .sessionOpus, .sessionSonnet, .sessionExtra: return .session
+        case .weeklyOpus, .weeklySonnet, .weeklyExtra: return .weekly
+        case .opusSonnet, .opusExtra: return .opus
+        case .sonnetExtra: return .sonnet
         }
     }
 
@@ -148,8 +196,16 @@ enum WidgetMediumLayout: String {
         case .sessionWeekly: return .weekly
         case .sessionOpus, .weeklyOpus: return .opus
         case .sessionSonnet, .weeklySonnet, .opusSonnet: return .sonnet
+        case .sessionExtra, .weeklyExtra, .opusExtra, .sonnetExtra: return .extra
         }
     }
+}
+
+/// Widget color display mode (mirrors main app's WidgetColorMode)
+enum WidgetColorDisplayMode: String {
+    case multiColor = "multiColor"
+    case monochrome = "monochrome"
+    case singleColor = "singleColor"
 }
 
 // MARK: - Widget Date Formatter
@@ -170,15 +226,43 @@ enum WidgetDateFormatter {
         let calendar = Calendar.current
         let formatter = DateFormatter()
 
-        if calendar.isDateInToday(date) {
+        // Round to nearest minute to prevent pinballing (e.g., 6:59:45 -> 7:00, 6:59:20 -> 6:59)
+        let roundedDate = roundToNearestMinute(date, using: calendar)
+
+        if calendar.isDateInToday(roundedDate) {
             formatter.dateFormat = "'Today' h:mma"
-        } else if calendar.isDateInTomorrow(date) {
+        } else if calendar.isDateInTomorrow(roundedDate) {
             formatter.dateFormat = "'Tomorrow' h:mma"
         } else {
             formatter.dateFormat = "MMM d, h:mma"
         }
 
-        return formatter.string(from: date)
+        return formatter.string(from: roundedDate)
+    }
+
+    /// Rounds the date to the nearest minute
+    private static func roundToNearestMinute(_ date: Date, using calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let seconds = components.second ?? 0
+
+        // Round: >= 30 seconds rounds up, < 30 seconds rounds down
+        if seconds >= 30 {
+            return calendar.date(byAdding: .minute, value: 1, to: calendar.date(from: DateComponents(
+                year: components.year,
+                month: components.month,
+                day: components.day,
+                hour: components.hour,
+                minute: components.minute
+            ))!) ?? date
+        } else {
+            return calendar.date(from: DateComponents(
+                year: components.year,
+                month: components.month,
+                day: components.day,
+                hour: components.hour,
+                minute: components.minute
+            )) ?? date
+        }
     }
 }
 
@@ -303,6 +387,13 @@ class WidgetDataProvider {
     private func decodeUsage(from data: Data) -> WidgetUsageData? {
         do {
             let fullUsage = try decoder.decode(ClaudeUsageCompat.self, from: data)
+
+            // Calculate extra usage percentage if available
+            var extraPercentage: Double? = nil
+            if let used = fullUsage.costUsed, let limit = fullUsage.costLimit, limit > 0 {
+                extraPercentage = (used / limit) * 100.0
+            }
+
             return WidgetUsageData(
                 sessionPercentage: fullUsage.sessionPercentage,
                 sessionResetTime: fullUsage.sessionResetTime,
@@ -310,6 +401,10 @@ class WidgetDataProvider {
                 weeklyResetTime: fullUsage.weeklyResetTime,
                 opusPercentage: fullUsage.opusWeeklyPercentage,
                 sonnetPercentage: fullUsage.sonnetWeeklyPercentage,
+                extraPercentage: extraPercentage,
+                extraUsed: fullUsage.costUsed,
+                extraLimit: fullUsage.costLimit,
+                extraCurrency: fullUsage.costCurrency,
                 lastUpdated: fullUsage.lastUpdated
             )
         } catch {
@@ -372,6 +467,75 @@ class WidgetDataProvider {
             return .sessionWeekly  // Default to session + weekly
         }
         return layout
+    }
+
+    /// Loads widget color mode preference from shared storage
+    func loadWidgetColorMode() -> WidgetColorDisplayMode {
+        guard let defaults = defaults,
+              let rawValue = defaults.string(forKey: "widgetColorMode"),
+              let mode = WidgetColorDisplayMode(rawValue: rawValue) else {
+            return .multiColor  // Default to threshold-based colors
+        }
+        return mode
+    }
+
+    /// Loads widget single color hex from shared storage
+    func loadWidgetSingleColorHex() -> String {
+        return defaults?.string(forKey: "widgetSingleColorHex") ?? "#00BFFF"  // Default cyan
+    }
+
+    /// Returns color for usage percentage based on color mode
+    func colorForUsage(_ percentage: Double, mode: WidgetColorDisplayMode, customColorHex: String) -> Color {
+        switch mode {
+        case .multiColor:
+            // Threshold-based colors
+            switch percentage {
+            case 90...:
+                return .red
+            case 75..<90:
+                return .orange
+            case 50..<75:
+                return .yellow
+            default:
+                return .green
+            }
+        case .monochrome:
+            return .primary
+        case .singleColor:
+            return hexToColor(customColorHex) ?? .cyan
+        }
+    }
+
+    /// Convert hex string to Color
+    private func hexToColor(_ hex: String) -> Color? {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+
+        var rgb: UInt64 = 0
+
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else {
+            return nil
+        }
+
+        let length = hexSanitized.count
+
+        switch length {
+        case 6: // RGB (24-bit)
+            return Color(
+                red: Double((rgb & 0xFF0000) >> 16) / 255.0,
+                green: Double((rgb & 0x00FF00) >> 8) / 255.0,
+                blue: Double(rgb & 0x0000FF) / 255.0
+            )
+        case 8: // RGBA (32-bit)
+            return Color(
+                red: Double((rgb & 0xFF000000) >> 24) / 255.0,
+                green: Double((rgb & 0x00FF0000) >> 16) / 255.0,
+                blue: Double((rgb & 0x0000FF00) >> 8) / 255.0,
+                opacity: Double(rgb & 0x000000FF) / 255.0
+            )
+        default:
+            return nil
+        }
     }
 }
 

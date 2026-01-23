@@ -54,20 +54,55 @@ extension Date {
     }
 
     /// Returns a formatted reset time string (e.g., "Today 3:59am" or "Oct 28, 12:59pm")
+    /// Rounds to the nearest minute to prevent display flickering between values like "6:59pm" and "7:00pm"
     func resetTimeString(from now: Date = Date(), timezone: TimeZone = .current) -> String {
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = timezone
         let formatter = DateFormatter()
         formatter.timeZone = timezone
 
-        if calendar.isDateInToday(self) {
+        // Round to nearest minute to prevent pinballing (e.g., 6:59:45 -> 7:00, 6:59:20 -> 6:59)
+        let roundedDate = self.roundedToNearestMinute(using: calendar)
+
+        if calendar.isDateInToday(roundedDate) {
             formatter.dateFormat = "'Today' h:mma"
-        } else if calendar.isDateInTomorrow(self) {
+        } else if calendar.isDateInTomorrow(roundedDate) {
             formatter.dateFormat = "'Tomorrow' h:mma"
         } else {
             formatter.dateFormat = "MMM d, h:mma"
         }
 
-        return formatter.string(from: self)
+        return formatter.string(from: roundedDate)
+    }
+
+    /// Rounds the date to the nearest minute (public convenience method)
+    func roundedToNearestMinute() -> Date {
+        return roundedToNearestMinute(using: Calendar.current)
+    }
+
+    /// Rounds the date to the nearest minute using a specific calendar
+    private func roundedToNearestMinute(using calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: self)
+        let seconds = components.second ?? 0
+
+        // Round: >= 30 seconds rounds up, < 30 seconds rounds down
+        if seconds >= 30 {
+            return calendar.date(byAdding: .minute, value: 1, to: calendar.date(from: DateComponents(
+                year: components.year,
+                month: components.month,
+                day: components.day,
+                hour: components.hour,
+                minute: components.minute
+            ))!) ?? self
+        } else {
+            return calendar.date(from: DateComponents(
+                year: components.year,
+                month: components.month,
+                day: components.day,
+                hour: components.hour,
+                minute: components.minute
+            )) ?? self
+        }
     }
 
     /// Returns time remaining rounded to full hours (e.g., "→2H", "→1H", "→<1H")

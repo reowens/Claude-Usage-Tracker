@@ -12,12 +12,17 @@ import Security
 class KeychainService {
     static let shared = KeychainService()
 
+    /// Shared keychain access group for helper binary access
+    /// Format: TeamID.bundleIdentifier
+    private let sharedAccessGroup = "7GSPYYN5X8.com.claudeusagetracker.shared"
+
     private init() {}
 
     /// Keychain item identifiers
     enum KeychainKey: String {
         case apiSessionKey = "com.claudeusagetracker.api-session-key"
         case claudeSessionKey = "com.claudeusagetracker.claude-session-key"
+        case organizationId = "com.claudeusagetracker.organization-id"
 
         var service: String {
             return rawValue
@@ -25,6 +30,13 @@ class KeychainService {
 
         var account: String {
             return "session-key"
+        }
+
+        /// Whether this key should be stored in the shared access group
+        /// NOTE: Disabled - shared access group was planned for helper binary but abandoned
+        /// All keys now use app-scoped storage (no access group = invisible to user)
+        var useSharedAccessGroup: Bool {
+            return false  // Shared access group not in use
         }
     }
 
@@ -40,12 +52,17 @@ class KeychainService {
             throw KeychainError.invalidData
         }
 
-        // First, try to update existing item
-        let updateQuery: [String: Any] = [
+        // Build base query
+        var updateQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: key.service,
             kSecAttrAccount as String: key.account
         ]
+
+        // Add shared access group if this key needs it
+        if key.useSharedAccessGroup {
+            updateQuery[kSecAttrAccessGroup as String] = sharedAccessGroup
+        }
 
         let attributes: [String: Any] = [
             kSecValueData as String: data
@@ -74,7 +91,7 @@ class KeychainService {
                 throw KeychainError.saveFailed(status: errSecParam)
             }
 
-            let addQuery: [String: Any] = [
+            var addQuery: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: key.service,
                 kSecAttrAccount as String: key.account,
@@ -83,10 +100,15 @@ class KeychainService {
                 kSecAttrSynchronizable as String: false
             ]
 
+            // Add shared access group if this key needs it
+            if key.useSharedAccessGroup {
+                addQuery[kSecAttrAccessGroup as String] = sharedAccessGroup
+            }
+
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
 
             if addStatus == errSecSuccess {
-                LoggingService.shared.log("Keychain: Added \(key.service)")
+                LoggingService.shared.log("Keychain: Added \(key.service)\(key.useSharedAccessGroup ? " (shared)" : "")")
                 return
             } else {
                 throw KeychainError.saveFailed(status: addStatus)
@@ -101,13 +123,18 @@ class KeychainService {
     /// - Returns: The stored string value, or nil if not found
     /// - Throws: KeychainError if load fails (other than item not found)
     func load(for key: KeychainKey) throws -> String? {
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: key.service,
             kSecAttrAccount as String: key.account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
+
+        // Add shared access group if this key needs it
+        if key.useSharedAccessGroup {
+            query[kSecAttrAccessGroup as String] = sharedAccessGroup
+        }
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -131,11 +158,16 @@ class KeychainService {
     /// - Parameter key: The keychain key identifier
     /// - Throws: KeychainError if delete fails (ignores item not found)
     func delete(for key: KeychainKey) throws {
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: key.service,
             kSecAttrAccount as String: key.account
         ]
+
+        // Add shared access group if this key needs it
+        if key.useSharedAccessGroup {
+            query[kSecAttrAccessGroup as String] = sharedAccessGroup
+        }
 
         let status = SecItemDelete(query as CFDictionary)
 
@@ -153,17 +185,83 @@ class KeychainService {
     /// - Parameter key: The keychain key identifier
     /// - Returns: true if the item exists, false otherwise
     func exists(for key: KeychainKey) -> Bool {
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: key.service,
             kSecAttrAccount as String: key.account,
             kSecReturnData as String: false
         ]
 
+        // Add shared access group if this key needs it
+        if key.useSharedAccessGroup {
+            query[kSecAttrAccessGroup as String] = sharedAccessGroup
+        }
+
         let status = SecItemCopyMatching(query as CFDictionary, nil)
         return status == errSecSuccess
     }
 
+    // MARK: - Migration
+
+    /// Migrates a keychain item from non-shared to shared access group.
+    /// This is needed when upgrading from older versions that stored keys without access groups.
+    /// - Parameter key: The keychain key to migrate
+    /// - Returns: true if migration was performed, false if no migration needed
+    @discardableResult
+    func migrateToSharedAccessGroup(for key: KeychainKey) -> Bool {
+        guard key.useSharedAccessGroup else {
+            return false // Key doesn't need shared access
+        }
+
+        // Check if key already exists in shared group
+        if exists(for: key) {
+            return false // Already migrated
+        }
+
+        // Try to load from non-shared (legacy) location
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: key.service,
+            kSecAttrAccount as String: key.account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+            // No access group = app-specific storage
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(legacyQuery as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let value = String(data: data, encoding: .utf8) else {
+            return false // No legacy item found
+        }
+
+        // Save to shared group
+        do {
+            try save(value, for: key)
+            LoggingService.shared.log("Keychain: Migrated \(key.service) to shared access group")
+
+            // Delete legacy item
+            let deleteQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: key.service,
+                kSecAttrAccount as String: key.account
+            ]
+            SecItemDelete(deleteQuery as CFDictionary)
+
+            return true
+        } catch {
+            LoggingService.shared.logError("Keychain: Failed to migrate \(key.service): \(error)")
+            return false
+        }
+    }
+
+    /// Migrates all applicable keys to shared access group
+    func migrateAllToSharedAccessGroup() {
+        migrateToSharedAccessGroup(for: .claudeSessionKey)
+        // organizationId is new, no migration needed
+    }
 }
 
 // MARK: - KeychainError

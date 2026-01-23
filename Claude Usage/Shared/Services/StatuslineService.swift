@@ -3,35 +3,101 @@ import Foundation
 /// Service for managing Claude Code statusline configuration.
 /// This service handles installation, configuration, and management of the statusline feature
 /// for Claude Code terminal integration.
+///
+/// Security: Credentials are stored in a protected file (~/.claude/.credentials) with 0600 permissions.
+/// Only the file owner can read/write. No secrets are embedded in scripts.
 class StatuslineService {
     static let shared = StatuslineService()
 
     private init() {}
 
-    // MARK: - Embedded Scripts
+    // MARK: - Credentials File
+
+    /// Path to the protected credentials file
+    private var credentialsFileURL: URL {
+        Constants.ClaudePaths.claudeDirectory.appendingPathComponent(".credentials")
+    }
+
+    /// Writes credentials to a protected file with 0600 permissions
+    private func writeCredentialsFile(sessionKey: String, organizationId: String) throws {
+        let claudeDir = Constants.ClaudePaths.claudeDirectory
+
+        if !FileManager.default.fileExists(atPath: claudeDir.path) {
+            try FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
+        }
+
+        // Format: SESSION_KEY=xxx\nORGANIZATION_ID=xxx
+        let content = """
+        SESSION_KEY=\(sessionKey)
+        ORGANIZATION_ID=\(organizationId)
+        """
+
+        try content.write(to: credentialsFileURL, atomically: true, encoding: .utf8)
+
+        // Set restrictive permissions: owner read/write only (0600)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: credentialsFileURL.path
+        )
+
+        LoggingService.shared.log("Credentials written to protected file with 0600 permissions")
+    }
+
+    /// Removes the credentials file
+    private func removeCredentialsFile() throws {
+        if FileManager.default.fileExists(atPath: credentialsFileURL.path) {
+            try FileManager.default.removeItem(at: credentialsFileURL)
+            LoggingService.shared.log("Removed credentials file")
+        }
+    }
+
+    // MARK: - Swift Script
 
     /// Swift script that fetches Claude usage data from the API.
-    /// Installed to ~/.claude/fetch-claude-usage.swift and executed by the bash statusline script.
-    /// The session key and organization ID are injected into this script when statusline is enabled.
-    private func generateSwiftScript(sessionKey: String, organizationId: String) -> String {
-        return """
+    /// Reads credentials from protected file at runtime - no embedded secrets.
+    private let swiftScript = """
 #!/usr/bin/env swift
 
 import Foundation
-func readSessionKey() -> String? {
-    // Session key injected from Keychain by Claude Usage app
-    let injectedKey = "\(sessionKey)"
-    let trimmedKey = injectedKey.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmedKey.isEmpty ? nil : trimmedKey
+
+// Read credentials from protected file
+func readCredentials() -> (sessionKey: String, orgId: String)? {
+    let credentialsPath = NSString(string: "~/.claude/.credentials").expandingTildeInPath
+
+    guard let content = try? String(contentsOfFile: credentialsPath, encoding: .utf8) else {
+        return nil
+    }
+
+    var sessionKey: String?
+    var orgId: String?
+
+    for line in content.components(separatedBy: .newlines) {
+        let parts = line.split(separator: "=", maxSplits: 1)
+        guard parts.count == 2 else { continue }
+
+        let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+        let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+
+        switch key {
+        case "SESSION_KEY":
+            sessionKey = value
+        case "ORGANIZATION_ID":
+            orgId = value
+        default:
+            break
+        }
+    }
+
+    guard let sk = sessionKey, !sk.isEmpty,
+          let oid = orgId, !oid.isEmpty else {
+        return nil
+    }
+
+    return (sk, oid)
 }
-func readOrganizationId() -> String? {
-    // Organization ID injected from settings by Claude Usage app
-    let injectedOrgId = "\(organizationId)"
-    let trimmedOrgId = injectedOrgId.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmedOrgId.isEmpty ? nil : trimmedOrgId
-}
+
 func fetchUsageData(sessionKey: String, orgId: String) async throws -> (utilization: Int, resetsAt: String?) {
-    // Build URL safely - validate orgId doesn't contain path traversal
+    // Validate org ID doesn't contain path traversal
     guard !orgId.contains(".."), !orgId.contains("/") else {
         throw NSError(domain: "ClaudeAPI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Invalid organization ID"])
     }
@@ -44,6 +110,7 @@ func fetchUsageData(sessionKey: String, orgId: String) async throws -> (utilizat
     request.setValue("sessionKey=\\(sessionKey)", forHTTPHeaderField: "Cookie")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     request.httpMethod = "GET"
+    request.timeoutInterval = 10
 
     let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -63,20 +130,17 @@ func fetchUsageData(sessionKey: String, orgId: String) async throws -> (utilizat
 }
 
 // Main execution
-// Use Task to run async code, RunLoop keeps script alive until exit() is called
 Task {
-    guard let sessionKey = readSessionKey() else {
-        print("ERROR:NO_SESSION_KEY")
-        exit(1)
-    }
-
-    guard let orgId = readOrganizationId() else {
-        print("ERROR:NO_ORG_CONFIGURED")
+    guard let credentials = readCredentials() else {
+        print("ERROR:NO_CREDENTIALS")
         exit(1)
     }
 
     do {
-        let (utilization, resetsAt) = try await fetchUsageData(sessionKey: sessionKey, orgId: orgId)
+        let (utilization, resetsAt) = try await fetchUsageData(
+            sessionKey: credentials.sessionKey,
+            orgId: credentials.orgId
+        )
 
         // Output format: UTILIZATION|RESETS_AT
         if let resets = resetsAt {
@@ -94,38 +158,39 @@ Task {
 // Keep script alive while async Task executes
 RunLoop.main.run()
 """
-    }
 
-    /// Placeholder Swift script for when statusline is disabled
-    /// This script returns an error indicating no session key is available
-    private let placeholderSwiftScript = """
+    /// Placeholder script for when statusline is disabled
+    private let placeholderScript = """
 #!/usr/bin/env swift
 
 import Foundation
 
-// No session key available - statusline is disabled
-print("ERROR:NO_SESSION_KEY")
+// Statusline disabled - no credentials available
+print("ERROR:NO_CREDENTIALS")
 exit(1)
 """
 
+    // MARK: - Bash Script
+
     /// Bash script that builds the statusline display.
-    /// Installed to ~/.claude/statusline-command.sh and configured in Claude Code settings.json.
-    /// Reads user preferences from ~/.claude/statusline-config.txt and displays selected components.
     private let bashScript = """
 #!/bin/bash
 config_file="$HOME/.claude/statusline-config.txt"
 if [ -f "$config_file" ]; then
-  source "$config_file"
-  show_dir=$SHOW_DIRECTORY
-  show_branch=$SHOW_BRANCH
-  show_usage=$SHOW_USAGE
-  show_bar=$SHOW_PROGRESS_BAR
-  show_reset=$SHOW_RESET_TIME
-  use_24h=$USE_24_HOUR_TIME
-  show_usage_label=$SHOW_USAGE_LABEL
-  show_reset_label=$SHOW_RESET_LABEL
-  color_mode=$COLOR_MODE
-  single_color=$SINGLE_COLOR
+  # Validate config file contains only expected variable assignments
+  if grep -qE '^[A-Z_]+=' "$config_file" && ! grep -qE '[;&|`$()]' "$config_file"; then
+    source "$config_file"
+  fi
+  show_dir=${SHOW_DIRECTORY:-1}
+  show_branch=${SHOW_BRANCH:-1}
+  show_usage=${SHOW_USAGE:-1}
+  show_bar=${SHOW_PROGRESS_BAR:-1}
+  show_reset=${SHOW_RESET_TIME:-1}
+  use_24h=${USE_24_HOUR_TIME:-0}
+  show_usage_label=${SHOW_USAGE_LABEL:-1}
+  show_reset_label=${SHOW_RESET_LABEL:-1}
+  color_mode=${COLOR_MODE:-colored}
+  single_color=${SINGLE_COLOR:-#00BFFF}
 else
   show_dir=1
   show_branch=1
@@ -136,6 +201,11 @@ else
   show_usage_label=1
   show_reset_label=1
   color_mode="colored"
+  single_color="#00BFFF"
+fi
+
+# Validate hex color format (security: prevent injection)
+if ! [[ "$single_color" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
   single_color="#00BFFF"
 fi
 
@@ -159,7 +229,6 @@ hex_to_ansi() {
 RESET=$'\\033[0m'
 
 if [ "$color_mode" = "monochrome" ]; then
-  # Monochrome mode - no colors
   BLUE=""
   GREEN=""
   GRAY=""
@@ -175,7 +244,6 @@ if [ "$color_mode" = "monochrome" ]; then
   LEVEL_9=""
   LEVEL_10=""
 elif [ "$color_mode" = "singleColor" ]; then
-  # Single color mode - use user's chosen color for everything
   single_ansi=$(hex_to_ansi "$single_color")
   BLUE=$single_ansi
   GREEN=$single_ansi
@@ -192,26 +260,23 @@ elif [ "$color_mode" = "singleColor" ]; then
   LEVEL_9=$single_ansi
   LEVEL_10=$single_ansi
 else
-  # Colored mode (default) - use full color palette
   BLUE=$'\\033[0;34m'
   GREEN=$'\\033[0;32m'
   GRAY=$'\\033[0;90m'
   YELLOW=$'\\033[0;33m'
 
-  # 10-level gradient: dark green → deep red
-  LEVEL_1=$'\\033[38;5;22m'   # dark green
-  LEVEL_2=$'\\033[38;5;28m'   # soft green
-  LEVEL_3=$'\\033[38;5;34m'   # medium green
-  LEVEL_4=$'\\033[38;5;100m'  # green-yellowish dark
-  LEVEL_5=$'\\033[38;5;142m'  # olive/yellow-green dark
-  LEVEL_6=$'\\033[38;5;178m'  # muted yellow
-  LEVEL_7=$'\\033[38;5;172m'  # muted yellow-orange
-  LEVEL_8=$'\\033[38;5;166m'  # darker orange
-  LEVEL_9=$'\\033[38;5;160m'  # dark red
-  LEVEL_10=$'\\033[38;5;124m' # deep red
+  LEVEL_1=$'\\033[38;5;22m'
+  LEVEL_2=$'\\033[38;5;28m'
+  LEVEL_3=$'\\033[38;5;34m'
+  LEVEL_4=$'\\033[38;5;100m'
+  LEVEL_5=$'\\033[38;5;142m'
+  LEVEL_6=$'\\033[38;5;178m'
+  LEVEL_7=$'\\033[38;5;172m'
+  LEVEL_8=$'\\033[38;5;166m'
+  LEVEL_9=$'\\033[38;5;160m'
+  LEVEL_10=$'\\033[38;5;124m'
 fi
 
-# Build components (without separators)
 dir_text=""
 if [ "$show_dir" = "1" ]; then
   dir_text="${BLUE}${current_dir}${RESET}"
@@ -268,7 +333,6 @@ if [ "$show_usage" = "1" ]; then
         [ "$filled_blocks" -gt 10 ] && filled_blocks=10
         empty_blocks=$((10 - filled_blocks))
 
-        # Build progress bar safely without seq
         progress_bar=" "
         i=0
         while [ $i -lt $filled_blocks ]; do
@@ -290,7 +354,6 @@ if [ "$show_usage" = "1" ]; then
         epoch=$(date -ju -f "%Y-%m-%dT%H:%M:%S" "$iso_time" "+%s" 2>/dev/null)
 
         if [ -n "$epoch" ]; then
-          # Round to nearest minute to prevent pinballing (e.g., 6:59:45 -> 7:00)
           seconds_part=$((epoch % 60))
           if [ "$seconds_part" -ge 30 ]; then
             epoch=$((epoch + (60 - seconds_part)))
@@ -298,12 +361,9 @@ if [ "$show_usage" = "1" ]; then
             epoch=$((epoch - seconds_part))
           fi
 
-          # Use user's time format preference from config
           if [ "$use_24h" = "1" ]; then
-            # 24-hour format
             reset_time=$(date -r "$epoch" "+%H:%M" 2>/dev/null)
           else
-            # 12-hour format (default)
             reset_time=$(date -r "$epoch" "+%I:%M %p" 2>/dev/null)
           fi
           if [ "$show_reset_label" = "1" ]; then
@@ -355,21 +415,19 @@ printf "%s\\n" "$output"
 
     // MARK: - Installation
 
-    /// Installs statusline scripts with session key injection from active profile
-    /// - Parameter injectSessionKey: If true, injects the session key from active profile into the Swift script
-    func installScripts(injectSessionKey: Bool = false) throws {
+    /// Installs statusline scripts and optionally writes credentials to protected file
+    func installScripts(withCredentials: Bool = false) throws {
         let claudeDir = Constants.ClaudePaths.claudeDirectory
 
         if !FileManager.default.fileExists(atPath: claudeDir.path) {
             try FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
         }
 
-        // Install Swift script (with or without session key)
+        // Install Swift script
         let swiftDestination = claudeDir.appendingPathComponent("fetch-claude-usage.swift")
-        let swiftScriptContent: String
+        let scriptContent: String
 
-        if injectSessionKey {
-            // Load session key and org ID from active profile
+        if withCredentials {
             guard let activeProfile = ProfileManager.shared.activeProfile else {
                 throw StatuslineError.noActiveProfile
             }
@@ -382,15 +440,16 @@ printf "%s\\n" "$output"
                 throw StatuslineError.organizationNotConfigured
             }
 
-            swiftScriptContent = generateSwiftScript(sessionKey: sessionKey, organizationId: organizationId)
-            LoggingService.shared.log("Injected session key and org ID from profile '\(activeProfile.name)' into statusline")
+            // Write credentials to protected file
+            try writeCredentialsFile(sessionKey: sessionKey, organizationId: organizationId)
+            scriptContent = swiftScript
+            LoggingService.shared.log("Installed statusline with credentials for profile '\(activeProfile.name)'")
         } else {
-            // Install placeholder script
-            swiftScriptContent = placeholderSwiftScript
-            LoggingService.shared.log("Installed placeholder statusline Swift script")
+            scriptContent = placeholderScript
+            LoggingService.shared.log("Installed placeholder statusline script")
         }
 
-        try swiftScriptContent.write(to: swiftDestination, atomically: true, encoding: .utf8)
+        try scriptContent.write(to: swiftDestination, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
             ofItemAtPath: swiftDestination.path
@@ -404,25 +463,30 @@ printf "%s\\n" "$output"
             ofItemAtPath: bashDestination.path
         )
 
-        print("[StatuslineService] Bash script installed to: \(bashDestination.path)")
+        LoggingService.shared.log("Scripts installed to: \(claudeDir.path)")
     }
 
-    /// Removes the session key from the statusline Swift script
-    func removeSessionKeyFromScript() throws {
+    /// Removes credentials file (disables statusline)
+    func removeCredentials() throws {
+        try removeCredentialsFile()
+
+        // Replace script with placeholder
         let swiftDestination = Constants.ClaudePaths.claudeDirectory
             .appendingPathComponent("fetch-claude-usage.swift")
-
-        // Replace with placeholder script that returns error
-        try placeholderSwiftScript.write(to: swiftDestination, atomically: true, encoding: .utf8)
+        try placeholderScript.write(to: swiftDestination, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
             ofItemAtPath: swiftDestination.path
         )
-
-        LoggingService.shared.log("Removed session key from statusline Swift script")
     }
 
     // MARK: - Configuration
+
+    /// Validates that a hex color string is in the correct format
+    private func isValidHexColor(_ hex: String) -> Bool {
+        let pattern = "^#[0-9A-Fa-f]{6}$"
+        return hex.range(of: pattern, options: .regularExpression) != nil
+    }
 
     func updateConfiguration(
         showDirectory: Bool,
@@ -436,6 +500,15 @@ printf "%s\\n" "$output"
         colorMode: StatuslineColorMode = .colored,
         singleColorHex: String = "#00BFFF"
     ) throws {
+        // Validate hex color to prevent injection
+        let safeColorHex: String
+        if isValidHexColor(singleColorHex) {
+            safeColorHex = singleColorHex
+        } else {
+            LoggingService.shared.logError("Invalid hex color format: \(singleColorHex), using default")
+            safeColorHex = "#00BFFF"
+        }
+
         let configPath = Constants.ClaudePaths.claudeDirectory
             .appendingPathComponent("statusline-config.txt")
 
@@ -459,19 +532,14 @@ USE_24_HOUR_TIME=\(use24HourTime ? "1" : "0")
 SHOW_USAGE_LABEL=\(showUsageLabel ? "1" : "0")
 SHOW_RESET_LABEL=\(showResetLabel ? "1" : "0")
 COLOR_MODE=\(colorModeString)
-SINGLE_COLOR=\(singleColorHex)
+SINGLE_COLOR=\(safeColorHex)
 """
 
         try config.write(to: configPath, atomically: true, encoding: .utf8)
-
-        // Debug: Log what was written
-        print("[StatuslineService] Config written to: \(configPath.path)")
-        print("[StatuslineService] Config content:\n\(config)")
+        LoggingService.shared.log("Config written to: \(configPath.path)")
     }
 
     /// Enables or disables statusline in Claude Code settings.json
-    /// When enabling, also injects the session key into the Swift script
-    /// When disabling, removes the session key from the Swift script
     func updateClaudeCodeSettings(enabled: Bool) throws {
         let settingsPath = Constants.ClaudePaths.claudeDirectory
             .appendingPathComponent("settings.json")
@@ -480,8 +548,8 @@ SINGLE_COLOR=\(singleColorHex)
         let commandPath = "\(homeDir)/.claude/statusline-command.sh"
 
         if enabled {
-            // Install scripts with session key injection
-            try installScripts(injectSessionKey: true)
+            // Install scripts with credentials
+            try installScripts(withCredentials: true)
 
             // Update settings.json
             var settings: [String: Any] = [:]
@@ -501,8 +569,8 @@ SINGLE_COLOR=\(singleColorHex)
             let jsonData = try JSONSerialization.data(withJSONObject: settings, options: .prettyPrinted)
             try jsonData.write(to: settingsPath)
         } else {
-            // Remove session key from Swift script
-            try removeSessionKeyFromScript()
+            // Remove credentials
+            try removeCredentials()
 
             // Update settings.json
             if FileManager.default.fileExists(atPath: settingsPath.path) {
@@ -530,10 +598,10 @@ SINGLE_COLOR=\(singleColorHex)
                FileManager.default.fileExists(atPath: bashScript.path)
     }
 
-    /// Updates scripts only if already installed (installation is optional)
+    /// Updates scripts only if already installed
     func updateScriptsIfInstalled() throws {
         guard isInstalled else { return }
-        try installScripts(injectSessionKey: true)
+        try installScripts(withCredentials: true)
     }
 
     /// Checks if active profile has a valid session key
@@ -543,9 +611,13 @@ SINGLE_COLOR=\(singleColorHex)
             return false
         }
 
-        // Use professional validator for comprehensive validation
         let validator = SessionKeyValidator()
         return validator.isValid(key)
+    }
+
+    /// Checks if credentials file exists
+    func hasCredentialsFile() -> Bool {
+        return FileManager.default.fileExists(atPath: credentialsFileURL.path)
     }
 }
 
@@ -555,6 +627,7 @@ enum StatuslineError: Error, LocalizedError {
     case noActiveProfile
     case sessionKeyNotFound
     case organizationNotConfigured
+    case invalidHexColor
 
     var errorDescription: String? {
         switch self {
@@ -564,6 +637,8 @@ enum StatuslineError: Error, LocalizedError {
             return "Session key not found in active profile. Please configure your session key first."
         case .organizationNotConfigured:
             return "Organization not configured in active profile. Please select an organization in the app settings."
+        case .invalidHexColor:
+            return "Invalid hex color format. Please use format #RRGGBB."
         }
     }
 }

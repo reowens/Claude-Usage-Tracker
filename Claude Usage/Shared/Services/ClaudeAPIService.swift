@@ -376,6 +376,17 @@ class ClaudeAPIService: APIServiceProtocol {
             // Use existing claude.ai flow
             let orgId = try await fetchOrganizationId(sessionKey: sessionKey)
 
+            // Validate org ID before using in URL paths (security fix #4)
+            guard URLBuilder.isValidPathSegment(orgId) else {
+                throw AppError(
+                    code: .urlMalformed,
+                    message: "Invalid organization ID format",
+                    technicalDetails: "Organization ID contains invalid characters",
+                    isRecoverable: true,
+                    recoverySuggestion: "Please refresh your organization settings"
+                )
+            }
+
             async let usageDataTask = performRequest(endpoint: "/organizations/\(orgId)/usage", sessionKey: sessionKey)
 
             // Use active profile's checkOverageLimitEnabled setting
@@ -689,6 +700,17 @@ class ClaudeAPIService: APIServiceProtocol {
     func sendInitializationMessage() async throws {
         let sessionKey = try readSessionKey()
         let orgId = try await fetchOrganizationId(sessionKey: sessionKey)
+
+        // Validate org ID before using in URL paths (security fix #4)
+        guard URLBuilder.isValidPathSegment(orgId) else {
+            throw AppError(
+                code: .urlMalformed,
+                message: "Invalid organization ID format",
+                technicalDetails: "Organization ID contains invalid characters",
+                isRecoverable: true,
+                recoverySuggestion: "Please refresh your organization settings"
+            )
+        }
 
         // Create a new conversation
         let conversationURL = try URLBuilder(baseURL: baseURL)

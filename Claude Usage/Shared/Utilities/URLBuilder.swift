@@ -13,6 +13,7 @@ enum URLBuilderError: LocalizedError {
     case invalidPath(String)
     case invalidQueryParameter(key: String, value: String)
     case malformedURL(String)
+    case invalidPathSegment(String)
 
     var errorDescription: String? {
         switch self {
@@ -24,6 +25,8 @@ enum URLBuilderError: LocalizedError {
             return "Invalid query parameter: \(key)=\(value)"
         case .malformedURL(let description):
             return "Malformed URL: \(description)"
+        case .invalidPathSegment(let segment):
+            return "Invalid path segment: \(segment)"
         }
     }
 }
@@ -152,6 +155,41 @@ struct URLBuilder {
         }
 
         return url
+    }
+}
+
+// MARK: - Validation
+
+extension URLBuilder {
+    /// Validates a path segment (like organization ID, conversation UUID) for safe URL inclusion
+    /// - Parameter segment: The path segment to validate
+    /// - Returns: true if the segment is safe for URL paths
+    static func isValidPathSegment(_ segment: String) -> Bool {
+        // Must be non-empty and reasonable length
+        guard !segment.isEmpty, segment.count <= 128 else { return false }
+
+        // Only allow alphanumeric characters, hyphens, and underscores (safe for URL paths)
+        // This matches UUIDs and typical API identifiers
+        let pattern = "^[a-zA-Z0-9_-]+$"
+        guard segment.range(of: pattern, options: .regularExpression) != nil else {
+            return false
+        }
+
+        // Extra safety: reject path traversal attempts
+        guard !segment.contains(".."), !segment.contains("/"), !segment.contains("\\") else {
+            return false
+        }
+
+        return true
+    }
+
+    /// Validates and appends a path segment (throws if invalid)
+    /// Use for untrusted input like stored identifiers
+    func appendingValidatedPathSegment(_ segment: String) throws -> URLBuilder {
+        guard URLBuilder.isValidPathSegment(segment) else {
+            throw URLBuilderError.invalidPathSegment(segment)
+        }
+        return try appendingPath(segment)
     }
 }
 

@@ -390,6 +390,8 @@ extension AppError {
             return AppError(code: .urlInvalidQuery, message: "Invalid query parameter", technicalDetails: "\(key)=\(value)", file: file, line: line, function: function)
         case .malformedURL(let details):
             return AppError(code: .urlMalformed, message: "Malformed URL", technicalDetails: details, file: file, line: line, function: function)
+        case .invalidPathSegment(let segment):
+            return AppError(code: .urlMalformed, message: "Invalid path segment", technicalDetails: segment, file: file, line: line, function: function)
         }
     }
 }

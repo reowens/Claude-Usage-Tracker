@@ -31,7 +31,9 @@ class ProfileStore {
     func saveProfiles(_ profiles: [Profile]) {
         do {
             let encoder = JSONEncoder()
-            encoder.outputFormatting = .prettyPrinted // For debugging
+            #if DEBUG
+            encoder.outputFormatting = .prettyPrinted // Only in debug builds
+            #endif
             let data = try encoder.encode(profiles)
             defaults.set(data, forKey: Keys.profiles)
 

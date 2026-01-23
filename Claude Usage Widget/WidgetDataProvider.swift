@@ -336,32 +336,50 @@ class WidgetDataProvider {
     func loadUsage() -> WidgetUsageData? {
         // Try file-based storage first
         if let data = loadFromFile(filename: "claudeUsageData.json") {
+            #if DEBUG
             print("Widget: Found file data (\(data.count) bytes)")
+            #endif
             if let usage = decodeUsage(from: data) {
+                #if DEBUG
                 print("Widget: Successfully decoded usage from file")
+                #endif
                 return usage
             } else {
+                #if DEBUG
                 print("Widget: Failed to decode usage from file")
+                #endif
             }
         } else {
+            #if DEBUG
             print("Widget: No file data found at container path: \(groupContainerURL?.path ?? "nil")")
+            #endif
         }
 
         // Fall back to UserDefaults
         if let defaults = defaults,
            let data = defaults.data(forKey: "claudeUsageData") {
+            #if DEBUG
             print("Widget: Found UserDefaults data (\(data.count) bytes)")
+            #endif
             if let usage = decodeUsage(from: data) {
+                #if DEBUG
                 print("Widget: Successfully decoded usage from UserDefaults")
+                #endif
                 return usage
             } else {
+                #if DEBUG
                 print("Widget: Failed to decode usage from UserDefaults")
+                #endif
             }
         } else {
+            #if DEBUG
             print("Widget: No UserDefaults data found (defaults nil: \(defaults == nil))")
+            #endif
         }
 
+        #if DEBUG
         print("Widget: Returning nil - no data available")
+        #endif
         return nil
     }
 
@@ -397,7 +415,9 @@ class WidgetDataProvider {
                 lastUpdated: fullUsage.lastUpdated
             )
         } catch {
+            #if DEBUG
             print("Widget: Decode error: \(error)")
+            #endif
             return nil
         }
     }

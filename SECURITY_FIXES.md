@@ -7,7 +7,7 @@ This document tracks security improvements identified during the January 2026 se
 | Issue | Severity | Status | Approach |
 |-------|----------|--------|----------|
 | #1 Session key embedded in script | CRITICAL | ✅ Complete | Protected credentials file (0600 permissions) |
-| #2 Credentials in plaintext JSON | HIGH | Pending | Move all credentials to Keychain |
+| #2 Credentials in plaintext JSON | HIGH | ✅ Complete | Per-profile Keychain storage |
 | #3 Shell injection via config sourcing | MEDIUM | ✅ Complete | Hex color validation + bash validation |
 | #4 Organization ID not validated | LOW | ✅ Complete | Add format validation |
 | #5 Pretty-printed JSON in ProfileStore | LOW | ✅ Complete | Remove `.prettyPrinted` |
@@ -159,53 +159,46 @@ Recommendation: Option A - keep all credentials in Keychain for consistency.
 
 ---
 
-## Issue #2: Credentials in Plaintext JSON (ProfileStore)
+## Issue #2: Credentials in Plaintext JSON (ProfileStore) ✅ COMPLETE
 
-### Current State
-- `ProfileStore.swift` saves profiles as JSON to UserDefaults
+### Original Problem
+- `ProfileStore.swift` saved profiles as JSON to UserDefaults
 - Credentials stored directly in Profile struct:
   - `claudeSessionKey`
   - `apiSessionKey`
   - `cliCredentialsJSON`
-- JSON is pretty-printed (human readable)
+- **Risk:** Credentials visible in plaintext in UserDefaults plist file
 
-### Location
-- [ProfileStore.swift:31-46](Claude%20Usage/Shared/Storage/ProfileStore.swift#L31-L46)
+### Solution Implemented: Per-Profile Keychain Storage
 
-### Solution
+Credentials are now stored in macOS Keychain with per-profile keys, completely separate from the JSON profile data.
 
-Move all sensitive credentials to Keychain, store only references in ProfileStore.
+**Key Changes:**
 
-#### Implementation
+1. **KeychainService** - Added per-profile credential methods:
+   - `saveProfileCredential(_:type:profileId:)` - Save credential to Keychain
+   - `loadProfileCredential(type:profileId:)` - Load credential from Keychain
+   - `deleteProfileCredential(type:profileId:)` - Delete credential from Keychain
+   - `deleteAllProfileCredentials(profileId:)` - Delete all credentials for a profile
+   - Keychain service format: `com.claudeusagetracker.profile.{UUID}.{credential-type}`
 
-1. **Modify Profile struct** - Remove credential fields, add only IDs/references
-2. **Create credential storage in Keychain** - Key format: `sessionKey-{profileId}`
-3. **Update ProfileStore** - Remove credential save/load, delegate to KeychainService
-4. **Migration** - Move existing credentials from ProfileStore to Keychain on app launch
+2. **ProfileStore** - Updated to use Keychain for credentials:
+   - `saveProfiles()` extracts credentials and saves to Keychain, then saves sanitized profile (no credentials) to JSON
+   - `loadProfiles()` loads profile from JSON, then loads credentials from Keychain
+   - Automatic migration: On load, if legacy credentials exist in JSON, they're migrated to Keychain and cleared from JSON
 
-#### Profile Struct Changes
+3. **Profile struct** - Unchanged (maintains API compatibility)
+   - Credentials are populated in memory after loading from Keychain
+   - Non-sensitive data (organizationId, apiOrganizationId) remains in JSON
 
-```swift
-// BEFORE:
-struct Profile: Codable {
-    var id: UUID
-    var name: String
-    var claudeSessionKey: String?        // Sensitive!
-    var apiSessionKey: String?           // Sensitive!
-    var cliCredentialsJSON: String?      // Sensitive!
-    var organizationId: String?
-    // ...
-}
+**Files Modified:**
+- `KeychainService.swift` - Added `ProfileCredentialType` enum and per-profile methods
+- `ProfileStore.swift` - Updated save/load to use Keychain for credentials
 
-// AFTER:
-struct Profile: Codable {
-    var id: UUID
-    var name: String
-    var organizationId: String?          // Not sensitive (just an ID)
-    var apiOrganizationId: String?       // Not sensitive
-    // Credentials accessed via KeychainService.loadCredential(for: profile.id)
-}
-```
+**Migration:**
+- Automatic one-time migration on first load after update
+- Legacy credentials in JSON are copied to Keychain, then JSON is re-saved without credentials
+- No user action required
 
 ---
 
@@ -314,18 +307,18 @@ encoder.outputFormatting = .prettyPrinted // Only in debug builds
 ## Implementation Order
 
 1. ✅ **Issue #1** (Critical) - Protected credentials file (0600 permissions)
-2. **Issue #2** (High) - Move credentials to Keychain - **PENDING**
+2. ✅ **Issue #2** (High) - Per-profile Keychain storage
 3. ✅ **Issue #3** (Medium) - Hex color validation
 4. ✅ **Issue #5** (Low) - Remove pretty printing
 5. ✅ **Issue #4** (Low) - Org ID validation
 
-Note: Issue #2 (ProfileStore credentials to Keychain) is the only remaining fix. This is a larger refactor that involves moving sensitive data from UserDefaults to Keychain.
+**All security fixes are now complete.**
 
 ---
 
 ## Notes
 
-- All changes should maintain backward compatibility during migration
-- Existing users should not lose their credentials
-- Add migration logic to handle upgrade from old storage to new
-- Consider adding a "security version" flag to detect when migration is needed
+- All changes maintain backward compatibility during migration
+- Existing users' credentials are automatically migrated to Keychain on first app launch
+- Migration is transparent - no user action required
+- Credentials are stored in app-scoped Keychain (no user prompts)

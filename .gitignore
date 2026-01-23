@@ -119,6 +119,12 @@ Temporary Items
 # Session Keys (sensitive)
 .claude-session-key
 
+# Environment files (API keys, tokens)
+.env
+.env.local
+.env.*.local
+*.env
+
 .claude
 
 # Backup files

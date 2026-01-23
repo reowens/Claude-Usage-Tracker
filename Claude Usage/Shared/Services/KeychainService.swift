@@ -262,6 +262,159 @@ class KeychainService {
         migrateToSharedAccessGroup(for: .claudeSessionKey)
         // organizationId is new, no migration needed
     }
+
+    // MARK: - Per-Profile Credential Storage
+
+    /// Credential types for per-profile storage
+    enum ProfileCredentialType: String, CaseIterable {
+        case claudeSessionKey = "claude-session-key"
+        case apiSessionKey = "api-session-key"
+        case cliCredentialsJSON = "cli-credentials"
+    }
+
+    /// Generates the service name for a profile credential
+    private func profileService(for profileId: UUID, type: ProfileCredentialType) -> String {
+        return "com.claudeusagetracker.profile.\(profileId.uuidString).\(type.rawValue)"
+    }
+
+    /// Saves a credential for a specific profile
+    func saveProfileCredential(_ value: String, type: ProfileCredentialType, profileId: UUID) throws {
+        guard let data = value.data(using: .utf8) else {
+            throw KeychainError.invalidData
+        }
+
+        let service = profileService(for: profileId, type: type)
+
+        // Try to update existing item first
+        let updateQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: profileId.uuidString
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(updateQuery as CFDictionary, attributes as CFDictionary)
+
+        if updateStatus == errSecSuccess {
+            LoggingService.shared.log("Keychain: Updated profile credential \(type.rawValue) for \(profileId)")
+            return
+        }
+
+        // If update fails because item doesn't exist, add new item
+        if updateStatus == errSecItemNotFound {
+            var accessControlError: Unmanaged<CFError>?
+            guard let accessControl = SecAccessControlCreateWithFlags(
+                kCFAllocatorDefault,
+                kSecAttrAccessibleWhenUnlocked,
+                [],
+                &accessControlError
+            ) else {
+                throw KeychainError.saveFailed(status: errSecParam)
+            }
+
+            let addQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: profileId.uuidString,
+                kSecValueData as String: data,
+                kSecAttrAccessControl as String: accessControl,
+                kSecAttrSynchronizable as String: false
+            ]
+
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+
+            if addStatus == errSecSuccess {
+                LoggingService.shared.log("Keychain: Added profile credential \(type.rawValue) for \(profileId)")
+                return
+            } else {
+                throw KeychainError.saveFailed(status: addStatus)
+            }
+        } else {
+            throw KeychainError.saveFailed(status: updateStatus)
+        }
+    }
+
+    /// Loads a credential for a specific profile
+    func loadProfileCredential(type: ProfileCredentialType, profileId: UUID) throws -> String? {
+        let service = profileService(for: profileId, type: type)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: profileId.uuidString,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecSuccess {
+            guard let data = result as? Data,
+                  let value = String(data: data, encoding: .utf8) else {
+                throw KeychainError.invalidData
+            }
+            return value
+        } else if status == errSecItemNotFound {
+            return nil
+        } else {
+            throw KeychainError.loadFailed(status: status)
+        }
+    }
+
+    /// Deletes a credential for a specific profile
+    func deleteProfileCredential(type: ProfileCredentialType, profileId: UUID) throws {
+        let service = profileService(for: profileId, type: type)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: profileId.uuidString
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+
+        if status == errSecSuccess {
+            LoggingService.shared.log("Keychain: Deleted profile credential \(type.rawValue) for \(profileId)")
+        } else if status != errSecItemNotFound {
+            throw KeychainError.deleteFailed(status: status)
+        }
+    }
+
+    /// Deletes all credentials for a specific profile
+    func deleteAllProfileCredentials(profileId: UUID) {
+        for type in ProfileCredentialType.allCases {
+            try? deleteProfileCredential(type: type, profileId: profileId)
+        }
+        LoggingService.shared.log("Keychain: Deleted all credentials for profile \(profileId)")
+    }
+
+    /// Saves all credentials for a profile from ProfileCredentials struct
+    func saveProfileCredentials(_ credentials: ProfileCredentials, profileId: UUID) throws {
+        if let claudeKey = credentials.claudeSessionKey {
+            try saveProfileCredential(claudeKey, type: .claudeSessionKey, profileId: profileId)
+        }
+        if let apiKey = credentials.apiSessionKey {
+            try saveProfileCredential(apiKey, type: .apiSessionKey, profileId: profileId)
+        }
+        if let cliJSON = credentials.cliCredentialsJSON {
+            try saveProfileCredential(cliJSON, type: .cliCredentialsJSON, profileId: profileId)
+        }
+    }
+
+    /// Loads all credentials for a profile into a ProfileCredentials struct
+    func loadProfileCredentials(profileId: UUID) throws -> ProfileCredentials {
+        return ProfileCredentials(
+            claudeSessionKey: try loadProfileCredential(type: .claudeSessionKey, profileId: profileId),
+            organizationId: nil,  // Org IDs stay in Profile (not sensitive)
+            apiSessionKey: try loadProfileCredential(type: .apiSessionKey, profileId: profileId),
+            apiOrganizationId: nil,  // Org IDs stay in Profile (not sensitive)
+            cliCredentialsJSON: try loadProfileCredential(type: .cliCredentialsJSON, profileId: profileId)
+        )
+    }
 }
 
 // MARK: - KeychainError

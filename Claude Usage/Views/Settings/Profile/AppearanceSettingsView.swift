@@ -73,6 +73,30 @@ struct AppearanceSettingsView: View {
                                 }
                             )
                         )
+
+                        SettingToggle(
+                            title: "appearance.show_time_marker_title".localized,
+                            description: "appearance.show_time_marker_description".localized,
+                            isOn: Binding(
+                                get: { configuration.showTimeMarker },
+                                set: { newValue in
+                                    configuration.showTimeMarker = newValue
+                                    saveConfiguration()
+                                }
+                            )
+                        )
+
+                        SettingToggle(
+                            title: "appearance.pace_coloring_title".localized,
+                            description: "appearance.pace_coloring_description".localized,
+                            isOn: Binding(
+                                get: { configuration.usePaceColoring },
+                                set: { newValue in
+                                    configuration.usePaceColoring = newValue
+                                    saveConfiguration()
+                                }
+                            )
+                        )
                     }
                 }
                 .disabled(isMultiProfileMode)

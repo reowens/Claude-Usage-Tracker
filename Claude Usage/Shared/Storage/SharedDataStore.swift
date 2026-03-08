@@ -18,8 +18,11 @@ class SharedDataStore {
         static let languageCode = "selectedLanguageCode"
 
         // Statusline Configuration
+        static let statuslineShowModel = "statuslineShowModel"
         static let statuslineShowDirectory = "statuslineShowDirectory"
         static let statuslineShowBranch = "statuslineShowBranch"
+        static let statuslineShowContext = "statuslineShowContext"
+        static let statuslineContextAsTokens = "statuslineContextAsTokens"
         static let statuslineShowUsage = "statuslineShowUsage"
         static let statuslineShowProgressBar = "statuslineShowProgressBar"
         static let statuslineShowResetTime = "statuslineShowResetTime"
@@ -28,6 +31,7 @@ class SharedDataStore {
         static let statuslineShowResetLabel = "statuslineShowResetLabel"
         static let statuslineColorMode = "statuslineColorMode"
         static let statuslineSingleColorHex = "statuslineSingleColorHex"
+        static let statuslineShowProfile = "statuslineShowProfile"
 
         // Widget Settings
         static let smallWidgetMetric = "smallWidgetMetric"
@@ -47,8 +51,22 @@ class SharedDataStore {
         static let hasStarredGitHub = "hasStarredGitHub"
         static let neverShowGitHubPrompt = "neverShowGitHubPrompt"
 
+        // Feedback Prompt Tracking
+        static let lastFeedbackPromptDate = "lastFeedbackPromptDate"
+        static let hasSubmittedFeedback = "hasSubmittedFeedback"
+        static let neverShowFeedbackPrompt = "neverShowFeedbackPrompt"
+
         // Debug Settings
         static let debugAPILoggingEnabled = "debugAPILoggingEnabled"
+
+        // Keyboard Shortcuts
+        static let shortcutTogglePopover = "shortcutTogglePopover"
+        static let shortcutRefresh = "shortcutRefresh"
+        static let shortcutOpenSettings = "shortcutOpenSettings"
+        static let shortcutNextProfile = "shortcutNextProfile"
+
+        // Auto-Switch Profile
+        static let autoSwitchProfileEnabled = "autoSwitchProfileEnabled"
     }
 
     init() {
@@ -73,6 +91,17 @@ class SharedDataStore {
     }
 
     // MARK: - Statusline Configuration
+
+    func saveStatuslineShowModel(_ show: Bool) {
+        defaults.set(show, forKey: Keys.statuslineShowModel)
+    }
+
+    func loadStatuslineShowModel() -> Bool {
+        if defaults.object(forKey: Keys.statuslineShowModel) == nil {
+            return true  // Default to true (checked)
+        }
+        return defaults.bool(forKey: Keys.statuslineShowModel)
+    }
 
     func saveStatuslineShowDirectory(_ show: Bool) {
         defaults.set(show, forKey: Keys.statuslineShowDirectory)
@@ -180,6 +209,39 @@ class SharedDataStore {
 
     func loadStatuslineSingleColorHex() -> String {
         return defaults.string(forKey: Keys.statuslineSingleColorHex) ?? "#00BFFF"  // Default cyan
+    }
+
+    func saveStatuslineShowContext(_ show: Bool) {
+        defaults.set(show, forKey: Keys.statuslineShowContext)
+    }
+
+    func loadStatuslineShowContext() -> Bool {
+        if defaults.object(forKey: Keys.statuslineShowContext) == nil {
+            return true  // Default to true (checked)
+        }
+        return defaults.bool(forKey: Keys.statuslineShowContext)
+    }
+
+    func saveStatuslineContextAsTokens(_ asTokens: Bool) {
+        defaults.set(asTokens, forKey: Keys.statuslineContextAsTokens)
+    }
+
+    func loadStatuslineContextAsTokens() -> Bool {
+        if defaults.object(forKey: Keys.statuslineContextAsTokens) == nil {
+            return false  // Default to false (percentage)
+        }
+        return defaults.bool(forKey: Keys.statuslineContextAsTokens)
+    }
+
+    func saveStatuslineShowProfile(_ show: Bool) {
+        defaults.set(show, forKey: Keys.statuslineShowProfile)
+    }
+
+    func loadStatuslineShowProfile() -> Bool {
+        if defaults.object(forKey: Keys.statuslineShowProfile) == nil {
+            return false  // Default to false (new feature)
+        }
+        return defaults.bool(forKey: Keys.statuslineShowProfile)
     }
 
     // MARK: - Widget Settings
@@ -411,6 +473,58 @@ class SharedDataStore {
         return timeSinceLastPrompt >= Constants.GitHubPromptTiming.reminderInterval
     }
 
+    // MARK: - Feedback Prompt Tracking
+
+    func saveLastFeedbackPromptDate(_ date: Date) {
+        defaults.set(date, forKey: Keys.lastFeedbackPromptDate)
+    }
+
+    func loadLastFeedbackPromptDate() -> Date? {
+        return defaults.object(forKey: Keys.lastFeedbackPromptDate) as? Date
+    }
+
+    func saveHasSubmittedFeedback(_ submitted: Bool) {
+        defaults.set(submitted, forKey: Keys.hasSubmittedFeedback)
+    }
+
+    func loadHasSubmittedFeedback() -> Bool {
+        return defaults.bool(forKey: Keys.hasSubmittedFeedback)
+    }
+
+    func saveNeverShowFeedbackPrompt(_ neverShow: Bool) {
+        defaults.set(neverShow, forKey: Keys.neverShowFeedbackPrompt)
+    }
+
+    func loadNeverShowFeedbackPrompt() -> Bool {
+        return defaults.bool(forKey: Keys.neverShowFeedbackPrompt)
+    }
+
+    func shouldShowFeedbackPrompt() -> Bool {
+        if loadNeverShowFeedbackPrompt() { return false }
+        if loadHasSubmittedFeedback() { return false }
+
+        guard let firstLaunch = loadFirstLaunchDate() else { return false }
+
+        let now = Date()
+        let timeSinceFirstLaunch = now.timeIntervalSince(firstLaunch)
+        if timeSinceFirstLaunch < Constants.FeedbackPromptTiming.initialDelay {
+            return false
+        }
+
+        guard let lastPrompt = loadLastFeedbackPromptDate() else {
+            return true
+        }
+
+        let timeSinceLastPrompt = now.timeIntervalSince(lastPrompt)
+        return timeSinceLastPrompt >= Constants.FeedbackPromptTiming.reminderInterval
+    }
+
+    func resetFeedbackPromptForTesting() {
+        defaults.removeObject(forKey: Keys.lastFeedbackPromptDate)
+        defaults.removeObject(forKey: Keys.hasSubmittedFeedback)
+        defaults.removeObject(forKey: Keys.neverShowFeedbackPrompt)
+    }
+
     // MARK: - Debug Settings
 
     func saveDebugAPILoggingEnabled(_ enabled: Bool) {
@@ -419,6 +533,44 @@ class SharedDataStore {
 
     func loadDebugAPILoggingEnabled() -> Bool {
         return defaults.bool(forKey: Keys.debugAPILoggingEnabled)
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    private func shortcutKey(for action: ShortcutAction) -> String {
+        switch action {
+        case .togglePopover: return Keys.shortcutTogglePopover
+        case .refresh: return Keys.shortcutRefresh
+        case .openSettings: return Keys.shortcutOpenSettings
+        case .nextProfile: return Keys.shortcutNextProfile
+        }
+    }
+
+    func saveShortcut(_ combo: KeyCombo?, for action: ShortcutAction) {
+        let key = shortcutKey(for: action)
+        if let combo = combo {
+            if let data = try? JSONEncoder().encode(combo) {
+                defaults.set(data, forKey: key)
+            }
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    func loadShortcut(for action: ShortcutAction) -> KeyCombo? {
+        let key = shortcutKey(for: action)
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(KeyCombo.self, from: data)
+    }
+
+    // MARK: - Auto-Switch Profile
+
+    func saveAutoSwitchProfileEnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Keys.autoSwitchProfileEnabled)
+    }
+
+    func loadAutoSwitchProfileEnabled() -> Bool {
+        return defaults.bool(forKey: Keys.autoSwitchProfileEnabled)
     }
 
     // MARK: - Testing Helpers

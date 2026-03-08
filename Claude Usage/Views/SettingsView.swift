@@ -1,29 +1,262 @@
 import SwiftUI
 import UserNotifications
 
+// MARK: - Visual Effect Backgrounds
+
+/// Full-window vibrancy background — same approach as the popover's VisualEffectBackground.
+/// Using NSViewRepresentable inside SwiftUI means the entire view tree is SwiftUI-managed,
+/// so there is no opaque flash on deminiaturize or appearance change.
+struct SettingsBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+
+        let effectView = NSVisualEffectView()
+        effectView.material = .hudWindow
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.isEmphasized = true
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(effectView)
+
+        let tintView = NSView()
+        tintView.wantsLayer = true
+        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        } else {
+            tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
+        }
+        tintView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(tintView)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: container.topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            tintView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            tintView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            tintView.topAnchor.constraint(equalTo: container.topAnchor),
+            tintView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        return container
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let tintView = nsView.subviews.last {
+            tintView.wantsLayer = true
+            if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
+            } else {
+                tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
+            }
+        }
+    }
+}
+
+struct SidebarVisualEffect: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+
+        let effectView = NSVisualEffectView()
+        effectView.material = .hudWindow
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.isEmphasized = true
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(effectView)
+
+        let tintView = NSView()
+        tintView.wantsLayer = true
+        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
+        } else {
+            tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.5).cgColor
+        }
+        tintView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(tintView)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: container.topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            tintView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            tintView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            tintView.topAnchor.constraint(equalTo: container.topAnchor),
+            tintView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        return container
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let tintView = nsView.subviews.last {
+            tintView.wantsLayer = true
+            if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
+            } else {
+                tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.5).cgColor
+            }
+        }
+    }
+}
+
+/// Borderless window that keeps rounded corners, shadow, and drag-to-move.
+final class BorderlessSettingsWindow: NSWindow {
+    override init(contentRect: NSRect, styleMask: NSWindow.StyleMask,
+                  backing: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect,
+                   styleMask: [.borderless, .miniaturizable],
+                   backing: backing, defer: flag)
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isMovableByWindowBackground = true
+        isRestorable = false
+
+        // Round corners via the content view's layer
+        contentView?.wantsLayer = true
+        contentView?.layer?.cornerRadius = 10
+        contentView?.layer?.masksToBounds = true
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+/// Builds the settings window — fully borderless, no system titlebar.
+enum SettingsWindowBuilder {
+    static func makeWindow(size: CGSize) -> NSWindow {
+        let window = BorderlessSettingsWindow(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+
+        let hostingView = NSHostingView(rootView:
+            SettingsView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        )
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        window.contentView?.addSubview(hostingView)
+        if let contentView = window.contentView {
+            NSLayoutConstraint.activate([
+                hostingView.topAnchor.constraint(equalTo: contentView.topAnchor),
+                hostingView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+                hostingView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                hostingView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            ])
+        }
+
+        return window
+    }
+}
+
+// MARK: - Custom Traffic Light Buttons
+
+struct TrafficLightButtons: View {
+    @Environment(\.controlActiveState) private var controlActiveState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TrafficLightButton(type: .close)
+            TrafficLightButton(type: .miniaturize)
+        }
+    }
+}
+
+struct TrafficLightButton: View {
+    enum ButtonType {
+        case close, miniaturize, zoom
+
+        var activeColor: Color {
+            switch self {
+            case .close: return Color(nsColor: NSColor(red: 1.0, green: 0.38, blue: 0.34, alpha: 1.0))
+            case .miniaturize: return Color(nsColor: NSColor(red: 1.0, green: 0.74, blue: 0.18, alpha: 1.0))
+            case .zoom: return Color(nsColor: NSColor(red: 0.15, green: 0.78, blue: 0.24, alpha: 1.0))
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .close: return "xmark"
+            case .miniaturize: return "minus"
+            case .zoom: return "plus"
+            }
+        }
+    }
+
+    let type: ButtonType
+    @State private var isHovered = false
+    @Environment(\.controlActiveState) private var controlActiveState
+
+    private var isActive: Bool { controlActiveState == .key }
+
+    var body: some View {
+        Circle()
+            .fill(isActive ? type.activeColor : Color.primary.opacity(0.15))
+            .frame(width: 12, height: 12)
+            .overlay {
+                if isHovered && isActive {
+                    Image(systemName: type.icon)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(.black.opacity(0.5))
+                }
+            }
+            .onHover { isHovered = $0 }
+            .onTapGesture { performAction() }
+    }
+
+    private func performAction() {
+        guard let window = NSApp.keyWindow else { return }
+        switch type {
+        case .close: window.close()
+        case .miniaturize: window.miniaturize(nil)
+        case .zoom: window.zoom(nil)
+        }
+    }
+}
+
 /// Professional, native macOS Settings interface with multi-profile support
 struct SettingsView: View {
     @State private var selectedSection: SettingsSection = .general
     @StateObject private var profileManager = ProfileManager.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             // Sidebar with Profile Switcher
             VStack(spacing: 0) {
+                // Traffic light buttons
+                HStack {
+                    TrafficLightButtons()
+                    Spacer()
+                }
+                .padding(.leading, 12)
+                .padding(.top, 12)
+
                 // Profile Section (Switcher + Credentials + Settings)
                 ProfileSectionContainer(selectedSection: $selectedSection)
                     .padding(.horizontal, 12)
-                    .padding(.top, 12)
+                    .padding(.top, 8)
 
                 Spacer()
 
-                // App Settings Section at bottom
+                // App Settings Section
                 AppSettingsSection(selectedSection: $selectedSection)
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
+
+                // Bottom bar: About, Debug, Support, Updates
+                BottomBarSection(selectedSection: $selectedSection)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                    .padding(.top, 4)
             }
-            .background(Color(nsColor: .windowBackgroundColor))
-            .frame(minWidth: 160, idealWidth: 170, maxWidth: 180)
+            .background(SidebarVisualEffect())
+            .frame(width: 190)
 
             // Content
             Group {
@@ -43,6 +276,8 @@ struct SettingsView: View {
                     MenuBarSettingsView()
                 case .widgets:
                     WidgetSettingsView()
+                case .history:
+                    UsageHistoryView()
                 case .claudeCode:
                     ClaudeCodeView()
 
@@ -51,15 +286,29 @@ struct SettingsView: View {
                     ManageProfilesView()
                 case .language:
                     LanguageSettingsView()
+                case .shortcuts:
+                    ShortcutsSettingsView()
                 case .updates:
                     UpdatesSettingsView()
+                case .support:
+                    SupportView()
+                case .mobileApp:
+                    MobileAppView()
+                case .debug:
+                    DebugNetworkLogView()
                 case .about:
                     AboutView()
                 }
             }
-            .frame(minWidth: 500, maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                colorScheme == .dark
+                    ? Color.black.opacity(0.15)
+                    : Color.white.opacity(0.3)
+            )
         }
-        .frame(width: 720, height: 580)
+        .frame(minWidth: 720, maxWidth: 720, maxHeight: .infinity)
+        .background(SettingsBackground())
     }
 }
 
@@ -154,11 +403,11 @@ struct ProfileSectionContainer: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                .fill(Color.primary.opacity(0.04))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
 }
@@ -169,7 +418,7 @@ struct AppSettingsSection: View {
     @Binding var selectedSection: SettingsSection
 
     var sharedSections: [SettingsSection] {
-        SettingsSection.allCases.filter { !$0.isProfileSetting && !$0.isCredential }
+        SettingsSection.allCases.filter { !$0.isProfileSetting && !$0.isCredential && !$0.isBottomBarItem }
     }
 
     var body: some View {
@@ -193,6 +442,45 @@ struct AppSettingsSection: View {
     }
 }
 
+struct BottomBarSection: View {
+    @Binding var selectedSection: SettingsSection
+    @State private var hoveredItem: SettingsSection?
+
+    var items: [SettingsSection] {
+        SettingsSection.allCases.filter { $0.isBottomBarItem }
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Divider()
+
+            HStack(spacing: 0) {
+                ForEach(items, id: \.self) { section in
+                Button {
+                    selectedSection = section
+                } label: {
+                    Image(systemName: section.icon)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(selectedSection == section ? .white : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(selectedSection == section ? SettingsColors.primary : (hoveredItem == section ? Color.primary.opacity(0.06) : Color.clear))
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    hoveredItem = hovering ? section : nil
+                }
+                .help(section.title)
+            }
+        }
+        }
+    }
+}
+
 enum SettingsSection: String, CaseIterable {
     // Credentials (not shown in sidebar)
     case claudeAI
@@ -203,12 +491,17 @@ enum SettingsSection: String, CaseIterable {
     case general
     case menuBar
     case widgets
+    case history
     case claudeCode
 
     // Shared Settings
     case manageProfiles
     case language
+    case shortcuts
     case updates
+    case support
+    case mobileApp
+    case debug
     case about
 
     var title: String {
@@ -219,10 +512,15 @@ enum SettingsSection: String, CaseIterable {
         case .general: return "section.general_title".localized
         case .menuBar: return "Menu Bar"
         case .widgets: return "Widgets"
+        case .history: return "section.history_title".localized
         case .manageProfiles: return "section.manage_profiles_title".localized
         case .language: return "language.title".localized
         case .claudeCode: return "settings.claude_cli".localized
+        case .shortcuts: return "section.shortcuts_title".localized
         case .updates: return "settings.updates".localized
+        case .support: return "section.support_title".localized
+        case .mobileApp: return "section.mobile_app_title".localized
+        case .debug: return "section.debug_title".localized
         case .about: return "settings.about".localized
         }
     }
@@ -235,10 +533,15 @@ enum SettingsSection: String, CaseIterable {
         case .general: return "gearshape.fill"
         case .menuBar: return "menubar.rectangle"
         case .widgets: return "square.grid.2x2.fill"
+        case .history: return "chart.bar.xaxis"
         case .manageProfiles: return "person.2.fill"
         case .language: return "globe"
         case .claudeCode: return "chevron.left.forwardslash.chevron.right"
+        case .shortcuts: return "keyboard"
         case .updates: return "arrow.down.circle.fill"
+        case .support: return "heart.fill"
+        case .mobileApp: return "iphone"
+        case .debug: return "ladybug.fill"
         case .about: return "info.circle.fill"
         }
     }
@@ -251,10 +554,15 @@ enum SettingsSection: String, CaseIterable {
         case .general: return "section.general_desc".localized
         case .menuBar: return "Configure menu bar appearance and metrics"
         case .widgets: return "Customize desktop widget appearance"
+        case .history: return "section.history_desc".localized
         case .manageProfiles: return "section.manage_profiles_desc".localized
         case .language: return "language.subtitle".localized
         case .claudeCode: return "settings.claude_cli.description".localized
+        case .shortcuts: return "section.shortcuts_desc".localized
         case .updates: return "settings.updates.description".localized
+        case .support: return "section.support_desc".localized
+        case .mobileApp: return "section.mobile_app_desc".localized
+        case .debug: return "section.debug_desc".localized
         case .about: return "settings.about.description".localized
         }
     }
@@ -270,7 +578,16 @@ enum SettingsSection: String, CaseIterable {
 
     var isProfileSetting: Bool {
         switch self {
-        case .general, .menuBar, .widgets, .claudeCode:
+        case .general, .menuBar, .widgets, .history, .claudeCode:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var isBottomBarItem: Bool {
+        switch self {
+        case .about, .debug, .support, .updates:
             return true
         default:
             return false
@@ -286,6 +603,7 @@ struct SidebarItem: View {
     let description: String
     let isSelected: Bool
     let action: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -305,13 +623,16 @@ struct SidebarItem: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? SettingsColors.primary : Color.clear)
+                    .fill(isSelected ? SettingsColors.primary : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
             )
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .help(description)
     }
 }
@@ -386,6 +707,7 @@ struct CredentialMiniCard: View {
     let title: String
     let isConnected: Bool
     let isSelected: Bool
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -411,10 +733,13 @@ struct CredentialMiniCard: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(isSelected ? SettingsColors.primary : Color.clear)
+                .fill(isSelected ? SettingsColors.primary : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
         )
         .padding(.horizontal, 4)
         .padding(.vertical, 1)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
@@ -422,6 +747,7 @@ struct SettingMiniButton: View {
     let icon: String
     let title: String
     let isSelected: Bool
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -442,9 +768,12 @@ struct SettingMiniButton: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(isSelected ? SettingsColors.primary : Color.clear)
+                .fill(isSelected ? SettingsColors.primary : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
         )
         .padding(.horizontal, 4)
         .padding(.vertical, 1)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }

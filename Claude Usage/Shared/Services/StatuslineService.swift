@@ -116,8 +116,11 @@ exit(1)
 config_file="$HOME/.claude/statusline-config.txt"
 if [ -f "$config_file" ]; then
   source "$config_file"
+  show_model=$SHOW_MODEL
   show_dir=$SHOW_DIRECTORY
   show_branch=$SHOW_BRANCH
+  show_context=$SHOW_CONTEXT
+  context_as_tokens=$CONTEXT_AS_TOKENS
   show_usage=$SHOW_USAGE
   show_bar=$SHOW_PROGRESS_BAR
   show_reset=$SHOW_RESET_TIME
@@ -126,9 +129,14 @@ if [ -f "$config_file" ]; then
   show_reset_label=$SHOW_RESET_LABEL
   color_mode=$COLOR_MODE
   single_color=$SINGLE_COLOR
+  show_profile=$SHOW_PROFILE
+  profile_name="$PROFILE_NAME"
 else
+  show_model=1
   show_dir=1
   show_branch=1
+  show_context=1
+  context_as_tokens=0
   show_usage=1
   show_bar=1
   show_reset=1
@@ -137,11 +145,14 @@ else
   show_reset_label=1
   color_mode="colored"
   single_color="#00BFFF"
+  show_profile=0
+  profile_name=""
 fi
 
 input=$(cat)
 current_dir_path=$(echo "$input" | grep -o '"current_dir":"[^"]*"' | sed 's/"current_dir":"//;s/"$//')
 current_dir=$(basename "$current_dir_path")
+model=$(echo "$input" | grep -o '"display_name":"[^"]*"' | sed 's/"display_name":"//;s/"$//')
 
 # Function to convert hex color to ANSI escape code
 hex_to_ansi() {
@@ -164,6 +175,8 @@ if [ "$color_mode" = "monochrome" ]; then
   GREEN=""
   GRAY=""
   YELLOW=""
+  CYAN=""
+  MAGENTA=""
   LEVEL_1=""
   LEVEL_2=""
   LEVEL_3=""
@@ -181,6 +194,8 @@ elif [ "$color_mode" = "singleColor" ]; then
   GREEN=$single_ansi
   GRAY=$single_ansi
   YELLOW=$single_ansi
+  CYAN=$single_ansi
+  MAGENTA=$single_ansi
   LEVEL_1=$single_ansi
   LEVEL_2=$single_ansi
   LEVEL_3=$single_ansi
@@ -197,6 +212,8 @@ else
   GREEN=$'\\033[0;32m'
   GRAY=$'\\033[0;90m'
   YELLOW=$'\\033[0;33m'
+  CYAN=$'\\033[0;36m'
+  MAGENTA=$'\\033[0;35m'
 
   # 10-level gradient: dark green → deep red
   LEVEL_1=$'\\033[38;5;22m'   # dark green
@@ -225,9 +242,82 @@ if [ "$show_branch" = "1" ]; then
   fi
 fi
 
+model_text=""
+if [ "$show_model" = "1" ] && [ -n "$model" ]; then
+  model_text="${YELLOW}${model}${RESET}"
+fi
+
+profile_text=""
+if [ "$show_profile" = "1" ] && [ -n "$profile_name" ]; then
+  profile_text="${MAGENTA}${profile_name}${RESET}"
+fi
+
+# Context percentage calculation from current_usage tokens
+context_text=""
+if [ "$show_context" = "1" ]; then
+  input_tokens=$(echo "$input" | grep -o '"input_tokens":[0-9]*' | head -1 | sed 's/"input_tokens"://')
+  cache_create=$(echo "$input" | grep -o '"cache_creation_input_tokens":[0-9]*' | sed 's/"cache_creation_input_tokens"://')
+  cache_read=$(echo "$input" | grep -o '"cache_read_input_tokens":[0-9]*' | sed 's/"cache_read_input_tokens"://')
+  context_size=$(echo "$input" | grep -o '"context_window_size":[0-9]*' | sed 's/"context_window_size"://')
+
+  [ -z "$input_tokens" ] && input_tokens=0
+  [ -z "$cache_create" ] && cache_create=0
+  [ -z "$cache_read" ] && cache_read=0
+
+  if [ -n "$context_size" ] && [ "$context_size" -gt 0 ]; then
+    current_tokens=$((input_tokens + cache_create + cache_read))
+    context_pct=$((current_tokens * 100 / context_size))
+
+    # Determine color based on percentage
+    if [ "$context_pct" -le 50 ]; then
+      context_color="$CYAN"
+    elif [ "$context_pct" -le 75 ]; then
+      context_color="$YELLOW"
+    else
+      context_color="$LEVEL_9"
+    fi
+
+    # Integer percentage for display
+    context_int=$context_pct
+
+    # Display as tokens or percentage
+    if [ "$context_as_tokens" = "1" ]; then
+      if [ "$current_tokens" -ge 1000 ]; then
+        tokens_k=$((current_tokens / 1000))
+        context_text="${context_color}Ctx: ${tokens_k}K${RESET}"
+      else
+        context_text="${context_color}Ctx: ${current_tokens}${RESET}"
+      fi
+    else
+      context_text="${context_color}Ctx: ${context_int}%${RESET}"
+    fi
+  fi
+fi
+
 usage_text=""
 if [ "$show_usage" = "1" ]; then
-  swift_result=$(swift "$HOME/.claude/fetch-claude-usage.swift" 2>/dev/null)
+  # Try reading from cache first (written by Claude Usage app on each refresh)
+  cache_file="$HOME/.claude/.statusline-usage-cache"
+  swift_result=""
+  if [ -f "$cache_file" ]; then
+    cache_ts=$(grep "^TIMESTAMP=" "$cache_file" 2>/dev/null | cut -d= -f2)
+    now_ts=$(date +%s)
+    if [ -n "$cache_ts" ]; then
+      cache_age=$((now_ts - cache_ts))
+      if [ "$cache_age" -lt 300 ]; then
+        cache_util=$(grep "^UTILIZATION=" "$cache_file" | cut -d= -f2)
+        cache_reset=$(grep "^RESETS_AT=" "$cache_file" | cut -d= -f2)
+        if [ -n "$cache_util" ]; then
+          swift_result="${cache_util}|${cache_reset}"
+        fi
+      fi
+    fi
+  fi
+
+  # Fall back to swift script if cache is stale or missing
+  if [ -z "$swift_result" ]; then
+    swift_result=$(swift "$HOME/.claude/fetch-claude-usage.swift" 2>/dev/null)
+  fi
 
   if [ $? -eq 0 ] && [ -n "$swift_result" ]; then
     utilization=$(echo "$swift_result" | cut -d'|' -f1)
@@ -338,13 +428,35 @@ fi
 output=""
 separator="${GRAY} │ ${RESET}"
 
+# New order: Directory → Branch → Model → Context → Usage
+# Directory comes first
 [ -n "$dir_text" ] && output="${dir_text}"
 
+# Then branch
 if [ -n "$branch_text" ]; then
   [ -n "$output" ] && output="${output}${separator}"
   output="${output}${branch_text}"
 fi
 
+# Then model
+if [ -n "$model_text" ]; then
+  [ -n "$output" ] && output="${output}${separator}"
+  output="${output}${model_text}"
+fi
+
+# Then profile
+if [ -n "$profile_text" ]; then
+  [ -n "$output" ] && output="${output}${separator}"
+  output="${output}${profile_text}"
+fi
+
+# Then context
+if [ -n "$context_text" ]; then
+  [ -n "$output" ] && output="${output}${separator}"
+  output="${output}${context_text}"
+fi
+
+# Finally usage
 if [ -n "$usage_text" ]; then
   [ -n "$output" ] && output="${output}${separator}"
   output="${output}${usage_text}"
@@ -425,8 +537,11 @@ printf "%s\\n" "$output"
     // MARK: - Configuration
 
     func updateConfiguration(
+        showModel: Bool,
         showDirectory: Bool,
         showBranch: Bool,
+        showContext: Bool,
+        contextAsTokens: Bool,
         showUsage: Bool,
         showProgressBar: Bool,
         showResetTime: Bool,
@@ -434,7 +549,9 @@ printf "%s\\n" "$output"
         showUsageLabel: Bool = true,
         showResetLabel: Bool = true,
         colorMode: StatuslineColorMode = .colored,
-        singleColorHex: String = "#00BFFF"
+        singleColorHex: String = "#00BFFF",
+        showProfile: Bool,
+        profileName: String
     ) throws {
         let configPath = Constants.ClaudePaths.claudeDirectory
             .appendingPathComponent("statusline-config.txt")
@@ -450,8 +567,11 @@ printf "%s\\n" "$output"
         }
 
         let config = """
+SHOW_MODEL=\(showModel ? "1" : "0")
 SHOW_DIRECTORY=\(showDirectory ? "1" : "0")
 SHOW_BRANCH=\(showBranch ? "1" : "0")
+SHOW_CONTEXT=\(showContext ? "1" : "0")
+CONTEXT_AS_TOKENS=\(contextAsTokens ? "1" : "0")
 SHOW_USAGE=\(showUsage ? "1" : "0")
 SHOW_PROGRESS_BAR=\(showProgressBar ? "1" : "0")
 SHOW_RESET_TIME=\(showResetTime ? "1" : "0")
@@ -460,6 +580,8 @@ SHOW_USAGE_LABEL=\(showUsageLabel ? "1" : "0")
 SHOW_RESET_LABEL=\(showResetLabel ? "1" : "0")
 COLOR_MODE=\(colorModeString)
 SINGLE_COLOR=\(singleColorHex)
+SHOW_PROFILE=\(showProfile ? "1" : "0")
+PROFILE_NAME="\(profileName)"
 """
 
         try config.write(to: configPath, atomically: true, encoding: .utf8)
@@ -467,6 +589,25 @@ SINGLE_COLOR=\(singleColorHex)
         // Debug: Log what was written
         print("[StatuslineService] Config written to: \(configPath.path)")
         print("[StatuslineService] Config content:\n\(config)")
+    }
+
+    /// Updates only the profile name in the statusline config file.
+    /// Called during profile switches to keep the config in sync.
+    func updateProfileNameInConfig(_ profileName: String) throws {
+        let configPath = Constants.ClaudePaths.claudeDirectory
+            .appendingPathComponent("statusline-config.txt")
+
+        guard FileManager.default.fileExists(atPath: configPath.path) else { return }
+
+        var content = try String(contentsOf: configPath, encoding: .utf8)
+
+        if let range = content.range(of: #"PROFILE_NAME="[^"]*""#, options: .regularExpression) {
+            content.replaceSubrange(range, with: "PROFILE_NAME=\"\(profileName)\"")
+        } else {
+            content += "\nPROFILE_NAME=\"\(profileName)\"\n"
+        }
+
+        try content.write(to: configPath, atomically: true, encoding: .utf8)
     }
 
     /// Enables or disables statusline in Claude Code settings.json
@@ -528,6 +669,25 @@ SINGLE_COLOR=\(singleColorHex)
 
         return FileManager.default.fileExists(atPath: swiftScript.path) &&
                FileManager.default.fileExists(atPath: bashScript.path)
+    }
+
+    /// Writes usage data to cache file for fast bash script access
+    func writeUsageCache(usage: ClaudeUsage, profileName: String? = nil) {
+        let cachePath = Constants.ClaudePaths.claudeDirectory
+            .appendingPathComponent(".statusline-usage-cache")
+
+        let formatter = ISO8601DateFormatter()
+        var cacheContent = """
+        UTILIZATION=\(Int(usage.sessionPercentage))
+        RESETS_AT=\(formatter.string(from: usage.sessionResetTime))
+        TIMESTAMP=\(Int(Date().timeIntervalSince1970))
+        """
+
+        if let name = profileName {
+            cacheContent += "\nPROFILE_NAME=\(name)"
+        }
+
+        try? cacheContent.write(to: cachePath, atomically: true, encoding: .utf8)
     }
 
     /// Updates scripts only if already installed (installation is optional)

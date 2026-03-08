@@ -19,7 +19,7 @@ final class StatusBarUIManager {
     // Current display mode
     private var isMultiProfileMode: Bool = false
 
-    private var appearanceObserver: NSKeyValueObservation?
+    private var appearanceObservers: [NSKeyValueObservation] = []
 
     // Icon renderer for creating menu bar images
     private let renderer = MenuBarIconRenderer()
@@ -47,6 +47,8 @@ final class StatusBarUIManager {
                 button.target = target
                 // Set a temporary placeholder - will be updated with actual logo
                 button.title = ""
+            } else {
+                LoggingService.shared.logWarning("Status bar button is nil - screens: \(NSScreen.screens.count)")
             }
 
             // Use a special key to identify the default icon
@@ -60,6 +62,8 @@ final class StatusBarUIManager {
                 if let button = statusItem.button {
                     button.action = action
                     button.target = target
+                } else {
+                    LoggingService.shared.logWarning("Status bar button is nil for \(metricConfig.metricType.displayName) - screens: \(NSScreen.screens.count)")
                 }
 
                 statusItems[metricConfig.metricType] = statusItem
@@ -124,8 +128,8 @@ final class StatusBarUIManager {
     }
 
     func cleanup() {
-        appearanceObserver?.invalidate()
-        appearanceObserver = nil
+        appearanceObservers.forEach { $0.invalidate() }
+        appearanceObservers.removeAll()
 
         // Clean up single profile status items
         for (_, statusItem) in statusItems {
@@ -175,6 +179,8 @@ final class StatusBarUIManager {
                 button.action = action
                 button.target = target
                 button.title = ""
+            } else {
+                LoggingService.shared.logWarning("Multi-profile status bar button is nil - screens: \(NSScreen.screens.count)")
             }
             // Use a placeholder UUID for default logo
             multiProfileStatusItems[UUID()] = statusItem
@@ -187,6 +193,8 @@ final class StatusBarUIManager {
                 if let button = statusItem.button {
                     button.action = action
                     button.target = target
+                } else {
+                    LoggingService.shared.logWarning("Multi-profile status bar button is nil for \(profile.name) - screens: \(NSScreen.screens.count)")
                 }
 
                 multiProfileStatusItems[profile.id] = statusItem
@@ -228,18 +236,38 @@ final class StatusBarUIManager {
                 showRemaining: showRemaining
             )
 
+            let sessionElapsed = UsageStatusCalculator.elapsedFraction(
+                resetTime: usage.sessionResetTime,
+                duration: Constants.sessionWindow,
+                showRemaining: false
+            )
+            let weekElapsed = UsageStatusCalculator.elapsedFraction(
+                resetTime: usage.weeklyResetTime,
+                duration: Constants.weeklyWindow,
+                showRemaining: false
+            )
             let sessionStatus = UsageStatusCalculator.calculateStatus(
                 usedPercentage: sessionUsed,
-                showRemaining: showRemaining
+                showRemaining: showRemaining,
+                elapsedFraction: config.usePaceColoring ? sessionElapsed : nil
             )
             let weekStatus = UsageStatusCalculator.calculateStatus(
                 usedPercentage: weekUsed,
-                showRemaining: showRemaining
+                showRemaining: showRemaining,
+                elapsedFraction: config.usePaceColoring ? weekElapsed : nil
             )
 
             // Use multi-profile config's useSystemColor as monochrome mode
             // When useSystemColor is ON, icons will be white (like single-profile monochrome)
             let useMonochrome = config.useSystemColor
+
+            // Calculate time marker fractions for multi-profile display
+            let sessionMarker: CGFloat? = config.showTimeMarker
+                ? sessionElapsed.map { CGFloat(showRemaining ? 1.0 - $0 : $0) }
+                : nil
+            let weekMarker: CGFloat? = config.showTimeMarker
+                ? weekElapsed.map { CGFloat(showRemaining ? 1.0 - $0 : $0) }
+                : nil
 
             // Create icon based on selected style
             let image: NSImage
@@ -254,7 +282,9 @@ final class StatusBarUIManager {
                         profileName: profile.name,
                         monochromeMode: useMonochrome,
                         isDarkMode: menuBarIsDark,
-                        useSystemColor: false
+                        useSystemColor: false,
+                        sessionTimeMarker: sessionMarker,
+                        weekTimeMarker: config.showWeek ? weekMarker : nil
                     )
                 } else {
                     image = renderer.createConcentricIcon(
@@ -265,7 +295,9 @@ final class StatusBarUIManager {
                         profileInitial: String(profile.name.prefix(1)),
                         monochromeMode: useMonochrome,
                         isDarkMode: menuBarIsDark,
-                        useSystemColor: false
+                        useSystemColor: false,
+                        sessionTimeMarker: sessionMarker,
+                        weekTimeMarker: config.showWeek ? weekMarker : nil
                     )
                 }
             case .progressBar:
@@ -277,13 +309,26 @@ final class StatusBarUIManager {
                     profileName: config.showProfileLabel ? profile.name : nil,
                     monochromeMode: useMonochrome,
                     isDarkMode: menuBarIsDark,
-                    useSystemColor: false
+                    useSystemColor: false,
+                    sessionTimeMarker: sessionMarker,
+                    weekTimeMarker: config.showWeek ? weekMarker : nil
                 )
             case .compact:
                 image = renderer.createCompactDot(
                     percentage: sessionDisplay,
                     status: sessionStatus,
                     profileInitial: config.showProfileLabel ? String(profile.name.prefix(1)) : nil,
+                    monochromeMode: useMonochrome,
+                    isDarkMode: menuBarIsDark,
+                    useSystemColor: false
+                )
+            case .percentage:
+                image = renderer.createMultiProfilePercentage(
+                    sessionPercentage: sessionDisplay,
+                    weekPercentage: config.showWeek ? weekDisplay : nil,
+                    sessionStatus: sessionStatus,
+                    weekStatus: weekStatus,
+                    profileName: config.showProfileLabel ? profile.name : nil,
                     monochromeMode: useMonochrome,
                     isDarkMode: menuBarIsDark,
                     useSystemColor: false
@@ -300,6 +345,23 @@ final class StatusBarUIManager {
     /// Checks if currently in multi-profile mode
     var isInMultiProfileMode: Bool {
         return isMultiProfileMode
+    }
+
+    /// Checks if status bar has at least one valid button (for headless mode detection)
+    var hasValidStatusBar: Bool {
+        // Check single-profile status items
+        for (_, statusItem) in statusItems {
+            if statusItem.button != nil {
+                return true
+            }
+        }
+        // Check multi-profile status items
+        for (_, statusItem) in multiProfileStatusItems {
+            if statusItem.button != nil {
+                return true
+            }
+        }
+        return false
     }
 
     /// Get button for a specific profile (multi-profile mode)
@@ -446,9 +508,38 @@ final class StatusBarUIManager {
     // MARK: - Appearance Observation
 
     private func observeAppearanceChanges() {
-        appearanceObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+        // Invalidate previous observers
+        appearanceObservers.forEach { $0.invalidate() }
+        appearanceObservers.removeAll()
+
+        // Observe each status bar button's effectiveAppearance (reflects wallpaper, not system mode)
+        let allButtons: [NSStatusBarButton] = {
+            var buttons: [NSStatusBarButton] = []
+            for (_, item) in statusItems {
+                if let button = item.button { buttons.append(button) }
+            }
+            for (_, item) in multiProfileStatusItems {
+                if let button = item.button { buttons.append(button) }
+            }
+            return buttons
+        }()
+
+        for button in allButtons {
+            let observer = button.observe(\.effectiveAppearance, options: [.new, .old]) { [weak self] btn, change in
+                // Only fire if the appearance actually changed
+                guard let oldAppearance = change.oldValue,
+                      let newAppearance = change.newValue,
+                      oldAppearance.name != newAppearance.name else { return }
+                self?.delegate?.statusBarAppearanceDidChange()
+            }
+            appearanceObservers.append(observer)
+        }
+
+        // Also observe app-level as fallback for system-wide dark/light mode toggle
+        let appObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             self?.delegate?.statusBarAppearanceDidChange()
         }
+        appearanceObservers.append(appObserver)
     }
 }
 

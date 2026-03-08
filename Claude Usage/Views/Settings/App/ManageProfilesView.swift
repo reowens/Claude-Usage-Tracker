@@ -118,7 +118,7 @@ struct ManageProfilesView: View {
 
                                 Picker("", selection: iconStyleBinding) {
                                     ForEach(MultiProfileIconStyle.allCases, id: \.self) { style in
-                                        Text(style.displayName).tag(style)
+                                        Text(style.shortNameKey.localized).tag(style)
                                     }
                                 }
                                 .pickerStyle(.segmented)
@@ -147,6 +147,36 @@ struct ManageProfilesView: View {
                                 isOn: useSystemColorBinding
                             )
 
+                            // Show Time Marker Toggle
+                            SettingToggle(
+                                title: "appearance.show_time_marker_title".localized,
+                                description: "appearance.show_time_marker_description".localized,
+                                isOn: Binding(
+                                    get: { profileManager.multiProfileConfig.showTimeMarker },
+                                    set: { showMarker in
+                                        var config = profileManager.multiProfileConfig
+                                        config.showTimeMarker = showMarker
+                                        profileManager.updateMultiProfileConfig(config)
+                                        NotificationCenter.default.post(name: .displayModeChanged, object: nil)
+                                    }
+                                )
+                            )
+
+                            // Pace-Aware Coloring Toggle
+                            SettingToggle(
+                                title: "appearance.pace_coloring_title".localized,
+                                description: "appearance.pace_coloring_description".localized,
+                                isOn: Binding(
+                                    get: { profileManager.multiProfileConfig.usePaceColoring },
+                                    set: { usePace in
+                                        var config = profileManager.multiProfileConfig
+                                        config.usePaceColoring = usePace
+                                        profileManager.updateMultiProfileConfig(config)
+                                        NotificationCenter.default.post(name: .displayModeChanged, object: nil)
+                                    }
+                                )
+                            )
+
                             // Info message
                             HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "info.circle.fill")
@@ -159,6 +189,24 @@ struct ManageProfilesView: View {
                             .padding(.top, DesignTokens.Spacing.small)
                         }
                     }
+                }
+
+                // Auto-Switch Profile Section
+                SettingsSectionCard(
+                    title: "auto_switch.title".localized,
+                    subtitle: "auto_switch.subtitle".localized
+                ) {
+                    SettingToggle(
+                        title: "auto_switch.enable_title".localized,
+                        description: "auto_switch.enable_description".localized,
+                        badge: .new,
+                        isOn: Binding(
+                            get: { SharedDataStore.shared.loadAutoSwitchProfileEnabled() },
+                            set: { enabled in
+                                SharedDataStore.shared.saveAutoSwitchProfileEnabled(enabled)
+                            }
+                        )
+                    )
                 }
 
                 // Info Card

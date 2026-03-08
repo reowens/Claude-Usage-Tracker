@@ -1,6 +1,58 @@
 import SwiftUI
 
-/// Smart, minimal, and professional popover interface
+// MARK: - Always-active vibrancy background
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+
+        // Base vibrancy layer
+        let effectView = NSVisualEffectView()
+        effectView.material = .hudWindow
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.isEmphasized = true
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(effectView)
+
+        // Solid tint overlay for more density
+        let tintView = NSView()
+        tintView.wantsLayer = true
+        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.25).cgColor
+        } else {
+            tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
+        }
+        tintView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(tintView)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: container.topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            tintView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            tintView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            tintView.topAnchor.constraint(equalTo: container.topAnchor),
+            tintView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        return container
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // Update tint for appearance changes
+        if let tintView = nsView.subviews.last {
+            tintView.wantsLayer = true
+            if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.25).cgColor
+            } else {
+                tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
+            }
+        }
+    }
+}
+
+/// Native macOS popover interface - minimal, flat, system-style
 struct PopoverContentView: View {
     @ObservedObject var manager: MenuBarManager
     let onRefresh: () -> Void
@@ -11,9 +63,18 @@ struct PopoverContentView: View {
     @State private var showInsights = false
     @StateObject private var profileManager = ProfileManager.shared
 
+    private func profileInitials(for name: String) -> String {
+        let words = name.split(separator: " ")
+        if words.count >= 2 {
+            return String(words[0].prefix(1) + words[1].prefix(1)).uppercased()
+        } else if let first = words.first {
+            return String(first.prefix(2)).uppercased()
+        }
+        return "?"
+    }
+
     // Computed properties for multi-profile mode support
     private var displayUsage: ClaudeUsage {
-        // In multi-profile mode, use the clicked profile's usage
         manager.clickedProfileUsage ?? manager.usage
     }
 
@@ -22,8 +83,8 @@ struct PopoverContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Smart Header with Status and Profile Switcher
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
             SmartHeader(
                 usage: displayUsage,
                 status: manager.status,
@@ -43,19 +104,96 @@ struct PopoverContentView: View {
                 clickedProfileId: manager.clickedProfileId
             )
 
-            // Intelligent Usage Dashboard
+            PopoverDivider()
+
+            // Error / stale data banners
+            if manager.hasCredentialError {
+                StatusBannerView(
+                    icon: "exclamationmark.triangle.fill",
+                    message: "popover.banner.credentials_expired".localized,
+                    color: .orange
+                ) {
+                    onPreferences()
+                }
+            } else if manager.consecutiveRefreshFailures >= 3 {
+                StatusBannerView(
+                    icon: "arrow.clockwise.circle.fill",
+                    message: String(format: "popover.banner.refresh_failed".localized, manager.consecutiveRefreshFailures),
+                    color: .yellow
+                ) {
+                    onRefresh()
+                }
+            } else if let lastRefresh = manager.lastSuccessfulRefreshTime,
+                      Date().timeIntervalSince(lastRefresh) > 300 {
+                let minutesAgo = Int(Date().timeIntervalSince(lastRefresh) / 60)
+                StatusBannerView(
+                    icon: "clock.fill",
+                    message: String(format: "popover.banner.updated_ago".localized, minutesAgo),
+                    color: .orange
+                ) {
+                    onRefresh()
+                }
+            }
+
+            // Viewing usage tag (shown in multi-profile mode)
+            if profileManager.displayMode == .multi,
+               let viewingProfile = manager.clickedProfileId.flatMap({ id in
+                   profileManager.profiles.first(where: { $0.id == id })
+               }) ?? profileManager.activeProfile {
+                HStack(spacing: 8) {
+                    // Profile initials avatar
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.15))
+                            .frame(width: 20, height: 20)
+
+                        Text(profileInitials(for: viewingProfile.name))
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                            .foregroundColor(.accentColor)
+                    }
+
+                    Text(viewingProfile.name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    if viewingProfile.id == profileManager.activeProfile?.id {
+                        Text("Active")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.accentColor.opacity(0.12))
+                            )
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.03))
+                )
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+            }
+
+            // Usage
             SmartUsageDashboard(usage: displayUsage, apiUsage: displayAPIUsage)
 
             // Contextual Insights
             if showInsights {
+                PopoverDivider()
                 ContextualInsights(usage: displayUsage)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
+                    .transition(.opacity)
             }
 
-            // Smart Footer with Actions
+            PopoverDivider()
+
+            // Footer
             SmartFooter(
                 usage: displayUsage,
                 status: manager.status,
@@ -65,7 +203,16 @@ struct PopoverContentView: View {
             )
         }
         .frame(width: 280)
-        .background(.regularMaterial)
+        .background(VisualEffectBackground())
+    }
+}
+
+// MARK: - Native Divider
+
+struct PopoverDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.horizontal, 16)
     }
 }
 
@@ -85,36 +232,30 @@ struct ProfileSwitcherCompact: View {
                     }
                 }) {
                     HStack(spacing: 8) {
-                        // Profile icon
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 12))
 
-                        // Profile name
                         Text(profile.name)
                             .font(.system(size: 12, weight: .medium))
 
                         Spacer()
 
-                        // Badges
                         HStack(spacing: 4) {
-                            // CLI Account badge
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(.green)
                             }
 
-                            // Claude.ai badge
                             if profile.claudeSessionKey != nil {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(.blue)
                             }
 
-                            // Active indicator
                             if profile.id == profileManager.activeProfile?.id {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(.accentColor)
                             }
                         }
@@ -133,42 +274,13 @@ struct ProfileSwitcherCompact: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
-                Text(profileManager.activeProfile?.name ?? "popover.no_profile".localized)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                // Status badges
-                if profileManager.activeProfile?.hasCliAccount == true || profileManager.activeProfile?.claudeSessionKey != nil {
-                    HStack(spacing: 3) {
-                        if profileManager.activeProfile?.hasCliAccount == true {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 5, height: 5)
-                        }
-                        if profileManager.activeProfile?.claudeSessionKey != nil {
-                            Circle()
-                                .fill(Color.blue)
-                                .frame(width: 5, height: 5)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(isHovered ? Color.accentColor.opacity(0.1) : Color.clear)
-            )
+            Text(profileManager.activeProfile?.name ?? "popover.no_profile".localized)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.primary)
+                .lineLimit(1)
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
     }
 }
 
@@ -188,36 +300,30 @@ struct ProfileSwitcherBar: View {
                     }
                 }) {
                     HStack(spacing: 8) {
-                        // Profile icon
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 12))
 
-                        // Profile name
                         Text(profile.name)
                             .font(.system(size: 12, weight: .medium))
 
                         Spacer()
 
-                        // Badges
                         HStack(spacing: 4) {
-                            // CLI Account badge
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(.green)
                             }
 
-                            // Claude.ai badge
                             if profile.claudeSessionKey != nil {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(.blue)
                             }
 
-                            // Active indicator
                             if profile.id == profileManager.activeProfile?.id {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(.accentColor)
                             }
                         }
@@ -236,46 +342,23 @@ struct ProfileSwitcherBar: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
-                // Profile avatar with gradient background
+            HStack(spacing: 8) {
+                // Profile avatar
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentColor.opacity(0.8), Color.accentColor],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 32, height: 32)
+                        .fill(Color.accentColor)
+                        .frame(width: 28, height: 28)
 
                     Text(profileInitials)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                 }
 
-                // Profile info
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text(profileManager.activeProfile?.name ?? "popover.no_profile".localized)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        // Status badges
-                        HStack(spacing: 3) {
-                            if profileManager.activeProfile?.hasCliAccount == true {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 5, height: 5)
-                            }
-                            if profileManager.activeProfile?.claudeSessionKey != nil {
-                                Circle()
-                                    .fill(Color.blue)
-                                    .frame(width: 5, height: 5)
-                            }
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(profileManager.activeProfile?.name ?? "popover.no_profile".localized)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
 
                     HStack(spacing: 4) {
                         if profileManager.profiles.count > 1 {
@@ -289,7 +372,7 @@ struct ProfileSwitcherBar: View {
                         }
 
                         Text("•")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 9))
                             .foregroundColor(.secondary.opacity(0.5))
 
                         Text("common.switch".localized)
@@ -300,36 +383,20 @@ struct ProfileSwitcherBar: View {
 
                 Spacer()
 
-                // Chevron indicator
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary.opacity(0.6))
-                    .rotationEffect(.degrees(isHovered ? 180 : 0))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(8)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        isHovered
-                        ? Color.accentColor.opacity(0.08)
-                        : Color(nsColor: .controlBackgroundColor).opacity(0.5)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(
-                                isHovered
-                                ? Color.accentColor.opacity(0.3)
-                                : Color.secondary.opacity(0.1),
-                                lineWidth: 1
-                            )
-                    )
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isHovered ? Color.primary.opacity(0.05) : Color.clear)
             )
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
         }
@@ -354,7 +421,7 @@ struct SmartHeader: View {
     let isRefreshing: Bool
     let onRefresh: () -> Void
     let onManageProfiles: () -> Void
-    var clickedProfileId: UUID? = nil  // Profile ID that was clicked in multi-profile mode
+    var clickedProfileId: UUID? = nil
 
     @StateObject private var profileManager = ProfileManager.shared
 
@@ -368,18 +435,15 @@ struct SmartHeader: View {
         }
     }
 
-    /// Check if we're in multi-profile mode
     private var isMultiProfileMode: Bool {
         profileManager.displayMode == .multi
     }
 
-    /// Get the clicked profile (for multi-profile mode)
     private var clickedProfile: Profile? {
         guard let id = clickedProfileId else { return nil }
         return profileManager.profiles.first { $0.id == id }
     }
 
-    /// Get initials from profile name
     private func profileInitials(for name: String) -> String {
         let words = name.split(separator: " ")
         if words.count >= 2 {
@@ -391,37 +455,18 @@ struct SmartHeader: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            // App Logo or Profile Initial
-            HStack(spacing: 8) {
-                if isMultiProfileMode, let profile = clickedProfile {
-                    // Show profile initial in multi-profile mode - clean, minimal style
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(nsColor: .controlBackgroundColor))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
-                            )
-                            .frame(width: 24, height: 24)
+        HStack {
+            HStack(spacing: 2) {
+                Image("HeaderLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 34, height: 34)
+                    .foregroundColor(.primary.opacity(0.3))
 
-                        Text(profileInitials(for: profile.name))
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    // Show app logo in single-profile mode
-                    Image("HeaderLogo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    // Profile Switcher (always shown)
+                VStack(alignment: .leading, spacing: 2) {
                     ProfileSwitcherCompact(onManageProfiles: onManageProfiles)
 
-                    // Claude Status Badge
+                    // Status
                     Button(action: {
                         if let url = URL(string: "https://status.claude.com") {
                             NSWorkspace.shared.open(url)
@@ -434,14 +479,8 @@ struct SmartHeader: View {
 
                             Text(status.description)
                                 .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.primary.opacity(0.8))
+                                .foregroundColor(.secondary)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(statusColor.opacity(0.12))
-                        )
                     }
                     .buttonStyle(.plain)
                     .help("Click to open status.claude.com")
@@ -450,7 +489,7 @@ struct SmartHeader: View {
 
             Spacer()
 
-            // Smart Refresh Button
+            // Refresh
             Button(action: onRefresh) {
                 ZStack {
                     if isRefreshing {
@@ -459,25 +498,18 @@ struct SmartHeader: View {
                             .frame(width: 14, height: 14)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     }
                 }
                 .foregroundColor(.secondary)
-                .frame(width: 24, height: 20)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.1))
-                )
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(isRefreshing)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.4))
-        )
+        .padding(.vertical, 10)
     }
 }
 
@@ -487,7 +519,6 @@ struct SmartUsageDashboard: View {
     let apiUsage: APIUsage?
     @StateObject private var profileManager = ProfileManager.shared
 
-    // Get the display mode from active profile's icon config
     private var showRemainingPercentage: Bool {
         profileManager.activeProfile?.iconConfig.showRemainingPercentage ?? false
     }
@@ -501,80 +532,112 @@ struct SmartUsageDashboard: View {
         profileManager.activeProfile?.iconConfig.singleColorHex ?? "#00BFFF"
     }
 
-    // Check if API tracking is enabled globally
+    private var showTimeMarker: Bool {
+        if profileManager.displayMode == .multi {
+            return profileManager.multiProfileConfig.showTimeMarker
+        }
+        return profileManager.activeProfile?.iconConfig.showTimeMarker ?? true
+    }
+
+    private var usePaceColoring: Bool {
+        if profileManager.displayMode == .multi {
+            return profileManager.multiProfileConfig.usePaceColoring
+        }
+        return profileManager.activeProfile?.iconConfig.usePaceColoring ?? true
+    }
+
+
     private var isAPITrackingEnabled: Bool {
         DataStore.shared.loadAPITrackingEnabled()
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            // Primary Usage Card
-            SmartUsageCard(
+        VStack(alignment: .leading, spacing: 6) {
+            // Primary: Session Usage
+            UsageRow(
                 title: "menubar.session_usage".localized,
                 subtitle: "menubar.5_hour_window".localized,
                 usedPercentage: usage.sessionPercentage,
                 showRemaining: showRemainingPercentage,
                 resetTime: usage.sessionResetTime,
-                isPrimary: true,
+                periodDuration: Constants.sessionWindow,
+                showTimeMarker: showTimeMarker,
+                usePaceColoring: usePaceColoring,
                 colorMode: colorMode,
                 singleColorHex: singleColorHex
             )
 
-            // Secondary Usage Cards
-            HStack(spacing: 8) {
-                SmartUsageCard(
-                    title: "menubar.all_models".localized,
-                    subtitle: "menubar.weekly".localized,
-                    usedPercentage: usage.weeklyPercentage,
+            // All Models (Weekly)
+            UsageRow(
+                title: "menubar.all_models".localized,
+                tag: "menubar.weekly".localized,
+                subtitle: nil,
+                usedPercentage: usage.weeklyPercentage,
+                showRemaining: showRemainingPercentage,
+                resetTime: usage.weeklyResetTime,
+                periodDuration: Constants.weeklyWindow,
+                showTimeMarker: showTimeMarker,
+                usePaceColoring: usePaceColoring,
+                colorMode: colorMode,
+                singleColorHex: singleColorHex
+            )
+
+            if usage.opusWeeklyTokensUsed > 0 {
+                UsageRow(
+                    title: "menubar.opus_usage".localized,
+                    tag: "menubar.weekly".localized,
+                    subtitle: nil,
+                    usedPercentage: usage.opusWeeklyPercentage,
                     showRemaining: showRemainingPercentage,
-                    resetTime: usage.weeklyResetTime,
-                    isPrimary: false,
+                    resetTime: nil,
+                    periodDuration: nil,
                     colorMode: colorMode,
                     singleColorHex: singleColorHex
                 )
-
-                if usage.opusWeeklyTokensUsed > 0 {
-                    SmartUsageCard(
-                        title: "menubar.opus_usage".localized,
-                        subtitle: "menubar.weekly".localized,
-                        usedPercentage: usage.opusWeeklyPercentage,
-                        showRemaining: showRemainingPercentage,
-                        resetTime: usage.weeklyResetTime,
-                        isPrimary: false,
-                        colorMode: colorMode,
-                        singleColorHex: singleColorHex
-                    )
-                }
-
-                if usage.sonnetWeeklyTokensUsed > 0 {
-                    SmartUsageCard(
-                        title: "menubar.sonnet_usage".localized,
-                        subtitle: "menubar.weekly".localized,
-                        usedPercentage: usage.sonnetWeeklyPercentage,
-                        showRemaining: showRemainingPercentage,
-                        resetTime: usage.sonnetWeeklyResetTime,
-                        isPrimary: false,
-                        colorMode: colorMode,
-                        singleColorHex: singleColorHex
-                    )
-                }
             }
 
+            if usage.sonnetWeeklyTokensUsed > 0 {
+                UsageRow(
+                    title: "menubar.sonnet_usage".localized,
+                    subtitle: nil,
+                    usedPercentage: usage.sonnetWeeklyPercentage,
+                    showRemaining: showRemainingPercentage,
+                    resetTime: usage.sonnetWeeklyResetTime,
+                    periodDuration: nil,
+                    colorMode: colorMode,
+                    singleColorHex: singleColorHex
+                )
+            }
+
+            // Extra usage (cost-based)
             if let used = usage.costUsed, let limit = usage.costLimit, let currency = usage.costCurrency, limit > 0 {
                 let usedPercentage = (used / limit) * 100.0
-                SmartUsageCard(
+                UsageRow(
                     title: "menubar.extra_usage".localized,
                     subtitle: String(format: "%.2f / %.2f %@", used / 100.0, limit / 100.0, currency),
                     usedPercentage: usedPercentage,
                     showRemaining: showRemainingPercentage,
                     resetTime: nil,
-                    isPrimary: false,
+                    periodDuration: nil,
                     colorMode: colorMode,
                     singleColorHex: singleColorHex
                 )
+
+                // Overage credit grant balance
+                if let balance = usage.overageBalance, let balanceCurrency = usage.overageBalanceCurrency {
+                    HStack {
+                        Text("popover.overage_balance".localized)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(String(format: "%.2f %@", balance / 100.0, balanceCurrency.uppercased()))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.green)
+                    }
+                }
             }
 
-            // API Usage Card (only if tracking is enabled AND profile has credentials)
+            // API Usage (only if tracking is enabled AND profile has credentials)
             if isAPITrackingEnabled,
                let apiUsage = apiUsage,
                let profile = profileManager.activeProfile,
@@ -587,23 +650,25 @@ struct SmartUsageDashboard: View {
                 )
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
     }
 }
 
-// MARK: - Smart Usage Card
-struct SmartUsageCard: View {
+// MARK: - Usage Row (flat, native style)
+struct UsageRow: View {
     let title: String
-    let subtitle: String
+    var tag: String? = nil
+    let subtitle: String?
     let usedPercentage: Double
     let showRemaining: Bool
     let resetTime: Date?
-    let isPrimary: Bool
+    let periodDuration: TimeInterval?
+    var showTimeMarker: Bool = true
+    var usePaceColoring: Bool = true
     var colorMode: MenuBarColorMode = .multiColor
     var singleColorHex: String = "#00BFFF"
 
-    /// Display percentage based on mode
     private var displayPercentage: Double {
         UsageStatusCalculator.getDisplayPercentage(
             usedPercentage: usedPercentage,
@@ -611,15 +676,27 @@ struct SmartUsageCard: View {
         )
     }
 
-    /// Status level based on display mode
-    private var statusLevel: UsageStatusLevel {
-        UsageStatusCalculator.calculateStatus(
-            usedPercentage: usedPercentage,
-            showRemaining: showRemaining
+    private var rawElapsedFraction: Double? {
+        UsageStatusCalculator.elapsedFraction(
+            resetTime: resetTime,
+            duration: periodDuration ?? 0,
+            showRemaining: false
         )
     }
 
-    /// Color based on status level and color mode settings
+    private var timeMarkerFraction: CGFloat? {
+        guard showTimeMarker, let f = rawElapsedFraction else { return nil }
+        return CGFloat(showRemaining ? 1.0 - f : f)
+    }
+
+    private var statusLevel: UsageStatusLevel {
+        UsageStatusCalculator.calculateStatus(
+            usedPercentage: usedPercentage,
+            showRemaining: showRemaining,
+            elapsedFraction: usePaceColoring ? rawElapsedFraction : nil
+        )
+    }
+
     private var statusColor: Color {
         switch colorMode {
         case .multiColor:
@@ -635,85 +712,77 @@ struct SmartUsageCard: View {
         }
     }
 
-    private var statusIcon: String {
-        switch statusLevel {
-        case .safe: return "checkmark.circle.fill"
-        case .moderate: return "exclamationmark.triangle.fill"
-        case .critical: return "xmark.circle.fill"
-        }
-    }
-
     var body: some View {
-        VStack(spacing: isPrimary ? 8 : 5) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: isPrimary ? 14 : 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+        VStack(alignment: .leading, spacing: 5) {
+            // Title row with percentage
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(title)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.primary)
 
-                    Text(subtitle)
-                        .font(.system(size: isPrimary ? 11 : 9, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                        if let tag = tag {
+                            Text(tag)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.primary.opacity(0.08))
+                                )
+                        }
+                    }
+
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Spacer(minLength: 4)
 
-                // Status indicator
-                HStack(spacing: 3) {
-                    Image(systemName: statusIcon)
-                        .font(.system(size: isPrimary ? 13 : 10, weight: .medium))
-                        .foregroundColor(statusColor)
-
-                    Text("\(Int(displayPercentage))%")
-                        .font(.system(size: isPrimary ? 18 : 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(statusColor)
-                }
+                Text("\(Int(displayPercentage))%")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(statusColor)
             }
 
-            // Progress visualization
-            VStack(spacing: 4) {
-                // Animated progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.secondary.opacity(0.15))
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(Color.primary.opacity(0.08))
 
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(
-                                LinearGradient(
-                                    colors: [statusColor, statusColor.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * min(displayPercentage / 100.0, 1.0))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                            .animation(.easeInOut(duration: 0.8), value: displayPercentage)
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(statusColor)
+                        .frame(width: geometry.size.width * min(displayPercentage / 100.0, 1.0))
+                        .animation(.easeInOut(duration: 0.6), value: displayPercentage)
+                }
+                .overlay(alignment: .leading) {
+                    if let fraction = timeMarkerFraction {
+                        Rectangle()
+                            .fill(Color(nsColor: .labelColor))
+                            .frame(width: 1.5)
+                            .offset(x: round(geometry.size.width * fraction))
                     }
                 }
-                .frame(height: isPrimary ? 8 : 6)
+            }
+            .frame(height: 4)
 
-                // Reset time information
-                if let reset = resetTime {
-                    HStack {
-                        Spacer()
-                        Text(reset.resetTimeString())
-                            .font(.system(size: isPrimary ? 10 : 9, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
+            // Reset time
+            if let reset = resetTime {
+                Text("menubar.resets_time".localized(with: reset.resetTimeString()))
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(isPrimary ? 12 : 10)
-        .frame(minHeight: isPrimary ? nil : 65)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.4))
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
     }
 }
@@ -725,7 +794,6 @@ struct ContextualInsights: View {
     private var insights: [Insight] {
         var result: [Insight] = []
 
-        // Session insights
         if usage.sessionPercentage > 80 {
             result.append(Insight(
                 icon: "exclamationmark.triangle.fill",
@@ -735,7 +803,6 @@ struct ContextualInsights: View {
             ))
         }
 
-        // Weekly insights
         if usage.weeklyPercentage > 90 {
             result.append(Insight(
                 icon: "clock.fill",
@@ -745,7 +812,6 @@ struct ContextualInsights: View {
             ))
         }
 
-        // Efficiency insights
         if usage.sessionPercentage < 20 && usage.weeklyPercentage < 30 {
             result.append(Insight(
                 icon: "checkmark.circle.fill",
@@ -759,37 +825,32 @@ struct ContextualInsights: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 2) {
             ForEach(insights, id: \.title) { insight in
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Image(systemName: insight.icon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11))
                         .foregroundColor(insight.color)
                         .frame(width: 16)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(insight.title)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.primary)
 
                         Text(insight.description)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
                             .lineLimit(2)
                     }
 
                     Spacer()
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(insight.color.opacity(0.08))
-                )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 }
 
@@ -809,28 +870,24 @@ struct SmartFooter: View {
     let onQuit: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-                .padding(.horizontal, 16)
+        HStack(spacing: 0) {
+            SmartActionButton(
+                icon: "gearshape.fill",
+                title: "common.settings".localized,
+                action: onPreferences
+            )
+            .frame(maxWidth: .infinity)
 
-            // Action buttons
-            HStack(spacing: 8) {
-                SmartActionButton(
-                    icon: "gearshape.fill",
-                    title: "common.settings".localized,
-                    action: onPreferences
-                )
-
-                SmartActionButton(
-                    icon: "power",
-                    title: "common.quit".localized,
-                    isDestructive: true,
-                    action: onQuit
-                )
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            SmartActionButton(
+                icon: "power",
+                title: "common.quit".localized,
+                isDestructive: true,
+                action: onQuit
+            )
+            .frame(maxWidth: .infinity)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }
 
@@ -856,12 +913,10 @@ struct ClaudeStatusRow: View {
             }
         }) {
             HStack(spacing: 8) {
-                // Status indicator dot
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
 
-                // Status text
                 Text(status.description)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.primary)
@@ -869,21 +924,20 @@ struct ClaudeStatusRow: View {
 
                 Spacer()
 
-                // External link icon
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 16)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovered ? Color.secondary.opacity(0.05) : Color.clear)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isHovered ? Color.accentColor.opacity(0.1) : Color.clear)
             )
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.1)) {
                 isHovered = hovering
             }
         }
@@ -891,7 +945,7 @@ struct ClaudeStatusRow: View {
     }
 }
 
-// MARK: - Smart Action Button
+// MARK: - Smart Action Button (kept for backward compatibility)
 struct SmartActionButton: View {
     let icon: String
     let title: String
@@ -902,30 +956,21 @@ struct SmartActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isDestructive ? .red : .secondary)
-                    .frame(width: 14)
+                    .font(.system(size: 10, weight: .medium))
+                    .frame(width: 12)
 
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isDestructive ? .red : .primary)
             }
+            .foregroundColor(isDestructive ? .red : (isHovered ? .primary : .secondary))
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(
-                        isHovered
-                        ? (isDestructive ? Color.red.opacity(0.1) : Color.accentColor.opacity(0.1))
-                        : Color.clear
-                    )
-            )
+            .padding(.vertical, 5)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
         }
@@ -939,7 +984,6 @@ struct APIUsageCard: View {
     var colorMode: MenuBarColorMode = .multiColor
     var singleColorHex: String = "#00BFFF"
 
-    /// Display percentage based on mode
     private var displayPercentage: Double {
         UsageStatusCalculator.getDisplayPercentage(
             usedPercentage: apiUsage.usagePercentage,
@@ -947,7 +991,6 @@ struct APIUsageCard: View {
         )
     }
 
-    /// Status level based on display mode
     private var statusLevel: UsageStatusLevel {
         UsageStatusCalculator.calculateStatus(
             usedPercentage: apiUsage.usagePercentage,
@@ -955,7 +998,6 @@ struct APIUsageCard: View {
         )
     }
 
-    /// Color based on status level and color mode settings
     private var usageColor: Color {
         switch colorMode {
         case .multiColor:
@@ -972,89 +1014,98 @@ struct APIUsageCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 5) {
             // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text("menubar.api_credits".localized)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.primary)
 
                     Text("menubar.anthropic_console".localized)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
 
-                // Percentage
                 Text("\(Int(displayPercentage))%")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundColor(usageColor)
             }
 
-            // Progress Bar
-            ZStack(alignment: .leading) {
-                // Background
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondary.opacity(0.1))
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(Color.primary.opacity(0.08))
 
-                // Fill
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(usageColor)
-                    .frame(maxWidth: .infinity)
-                    .scaleEffect(x: displayPercentage / 100.0, y: 1.0, anchor: .leading)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(usageColor)
+                        .frame(width: geometry.size.width * min(displayPercentage / 100.0, 1.0))
+                        .animation(.easeInOut(duration: 0.6), value: displayPercentage)
+                }
             }
-            .frame(height: 8)
+            .frame(height: 4)
 
             // Used / Remaining
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("menubar.used".localized)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Text(apiUsage.formattedUsed)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
+            HStack {
+                Text(apiUsage.formattedUsed)
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("menubar.remaining".localized)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Text(apiUsage.formattedRemaining)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
+                Text(apiUsage.formattedRemaining)
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
 
             // Reset Time
             if apiUsage.resetsAt > Date() {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
-
-                    Text("menubar.resets_time".localized(with: apiUsage.resetsAt.formatted(.relative(presentation: .named))))
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-                }
+                Text("menubar.resets_time".localized(with: apiUsage.resetsAt.formatted(.relative(presentation: .named))))
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.4))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(usageColor.opacity(0.2), lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
+    }
+}
+
+// MARK: - Status Banner View
+struct StatusBannerView: View {
+    let icon: String
+    let message: String
+    let color: Color
+    var onTap: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundColor(color)
+            Text(message)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+            Spacer()
+            if onTap != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.12))
+        .cornerRadius(6)
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
+        .onTapGesture { onTap?() }
     }
 }

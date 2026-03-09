@@ -162,6 +162,21 @@ struct ManageProfilesView: View {
                                 )
                             )
 
+                            // Pace Marker Toggle
+                            SettingToggle(
+                                title: "appearance.show_pace_marker_title".localized,
+                                description: "appearance.show_pace_marker_description".localized,
+                                isOn: Binding(
+                                    get: { profileManager.multiProfileConfig.showPaceMarker },
+                                    set: { showPace in
+                                        var config = profileManager.multiProfileConfig
+                                        config.showPaceMarker = showPace
+                                        profileManager.updateMultiProfileConfig(config)
+                                        NotificationCenter.default.post(name: .displayModeChanged, object: nil)
+                                    }
+                                )
+                            )
+
                             // Pace-Aware Coloring Toggle
                             SettingToggle(
                                 title: "appearance.pace_coloring_title".localized,

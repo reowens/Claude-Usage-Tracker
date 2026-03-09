@@ -19,7 +19,7 @@ struct SmallWidgetView: View {
                 // Circular progress indicator - sized for ~170x170 widget
                 ZStack {
                     Circle()
-                        .stroke(ringBackgroundColor, lineWidth: WidgetDesign.Ring.lineWidth)
+                        .stroke(Color.white.opacity(WidgetDesign.Colors.glassProgressBg), lineWidth: WidgetDesign.Ring.lineWidth)
 
                     Circle()
                         .trim(from: 0, to: min(metricData.percentage / 100, 1.0))
@@ -29,6 +29,20 @@ struct SmallWidgetView: View {
                         )
                         .rotationEffect(.degrees(-90))
                         .animation(.easeInOut, value: metricData.percentage)
+
+                    // Pace marker dot on ring circumference
+                    if let paceData = usage.paceData(for: entry.smallMetric) {
+                        let angleRadians = (-Double.pi / 2) + (paceData.elapsed * 2 * Double.pi)
+                        let radius = (WidgetDesign.Ring.size - WidgetDesign.Ring.lineWidth) / 2
+                        let centerPt = WidgetDesign.Ring.size / 2
+                        Circle()
+                            .fill(paceData.pace.color)
+                            .frame(width: 5, height: 5)
+                            .position(
+                                x: centerPt + radius * cos(angleRadians),
+                                y: centerPt + radius * sin(angleRadians)
+                            )
+                    }
 
                     VStack(spacing: 0) {
                         Text("\(Int(metricData.percentage.rounded()))%")
@@ -147,10 +161,6 @@ struct SmallWidgetView: View {
     }
 
     // MARK: - Style-dependent colors
-
-    private var ringBackgroundColor: Color {
-        Color.white.opacity(0.15)  // Very subtle background for ring track
-    }
 
     private var secondaryTextColor: Color {
         Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)

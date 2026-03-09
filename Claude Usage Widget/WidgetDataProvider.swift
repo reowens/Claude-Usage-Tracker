@@ -289,16 +289,9 @@ enum WidgetDesign {
     }
 
     enum Colors {
-        // Glass style opacities
-        static let glassCardBg: Double = 0.06
-        static let glassProgressBg: Double = 0.12
+        static let glassProgressBg: Double = 0.15
         static let glassSecondaryText: Double = 0.6
         static let glassDivider: Double = 0.15
-
-        // Standard style opacities
-        static let standardCardBg: Double = 0.08
-        static let standardProgressBg: Double = 0.2
-        static let standardDivider: Double = 0.3
     }
 
     enum NoData {

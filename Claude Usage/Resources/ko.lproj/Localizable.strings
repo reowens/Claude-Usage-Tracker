@@ -181,6 +181,8 @@
 "appearance.show_remaining_description" = "사용된 퍼센트 대신 남은 용량 표시 (macOS 배터리처럼)";
 "appearance.show_time_marker_title" = "경과 시간 마커 표시";
 "appearance.show_time_marker_description" = "진행 막대에 기간 내 경과 시간을 나타내는 마커를 표시합니다";
+"appearance.show_pace_marker_title" = "속도별 마커 색상";
+"appearance.show_pace_marker_description" = "예상 사용 속도에 따라 시간 마커 색상을 변경합니다(녹색~보라색). 바가 없는 스타일에서는 속도 점을 표시합니다.";
 "appearance.pace_coloring_title" = "속도 기반 색상";
 "appearance.pace_coloring_description" = "예상 사용 속도에 따라 표시기 색상을 지정합니다. 비활성화 시 색상은 현재 사용량만 반영합니다.";
 "appearance.multiprofile_locked_title" = "모양 설정 잠김";
@@ -488,6 +490,8 @@
 "claudecode.component_branch" = "Git 브랜치";
 "claudecode.component_usage" = "사용 통계";
 "claudecode.component_progressbar" = "진행률 표시줄";
+"claudecode.component_pace_marker" = "페이스 마커";
+"claudecode.pace_marker_info" = "경과 시간 위치에 색상 표시를 보여줍니다";
 "claudecode.component_resettime" = "리셋 시간";
 "claudecode.requirement_sessionkey" = "• 자격 증명 → Claude.ai 탭에서 세션 키 구성됨";
 "claudecode.requirement_restart" = "• 변경사항 적용 후 Claude CLI 재시작";

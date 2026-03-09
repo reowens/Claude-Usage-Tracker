@@ -123,6 +123,7 @@ if [ -f "$config_file" ]; then
   context_as_tokens=$CONTEXT_AS_TOKENS
   show_usage=$SHOW_USAGE
   show_bar=$SHOW_PROGRESS_BAR
+  show_pace_marker=$SHOW_PACE_MARKER
   show_reset=$SHOW_RESET_TIME
   use_24h=$USE_24_HOUR_TIME
   show_usage_label=$SHOW_USAGE_LABEL
@@ -139,6 +140,7 @@ else
   context_as_tokens=0
   show_usage=1
   show_bar=1
+  show_pace_marker=1
   show_reset=1
   use_24h=0
   show_usage_label=1
@@ -187,6 +189,12 @@ if [ "$color_mode" = "monochrome" ]; then
   LEVEL_8=""
   LEVEL_9=""
   LEVEL_10=""
+  PACE_COMFORTABLE=""
+  PACE_ON_TRACK=""
+  PACE_WARMING=""
+  PACE_PRESSING=""
+  PACE_CRITICAL=""
+  PACE_RUNAWAY=""
 elif [ "$color_mode" = "singleColor" ]; then
   # Single color mode - use user's chosen color for everything
   single_ansi=$(hex_to_ansi "$single_color")
@@ -206,6 +214,12 @@ elif [ "$color_mode" = "singleColor" ]; then
   LEVEL_8=$single_ansi
   LEVEL_9=$single_ansi
   LEVEL_10=$single_ansi
+  PACE_COMFORTABLE=$single_ansi
+  PACE_ON_TRACK=$single_ansi
+  PACE_WARMING=$single_ansi
+  PACE_PRESSING=$single_ansi
+  PACE_CRITICAL=$single_ansi
+  PACE_RUNAWAY=$single_ansi
 else
   # Colored mode (default) - use full color palette
   BLUE=$'\\033[0;34m'
@@ -226,6 +240,14 @@ else
   LEVEL_8=$'\\033[38;5;166m'  # darker orange
   LEVEL_9=$'\\033[38;5;160m'  # dark red
   LEVEL_10=$'\\033[38;5;124m' # deep red
+
+  # 6-tier pace marker colors
+  PACE_COMFORTABLE=$'\\033[38;5;34m'  # green
+  PACE_ON_TRACK=$'\\033[38;5;37m'     # teal
+  PACE_WARMING=$'\\033[38;5;178m'     # yellow
+  PACE_PRESSING=$'\\033[38;5;208m'    # orange
+  PACE_CRITICAL=$'\\033[38;5;160m'    # red
+  PACE_RUNAWAY=$'\\033[38;5;135m'     # purple
 fi
 
 # Build components (without separators)
@@ -323,6 +345,13 @@ if [ "$show_usage" = "1" ]; then
     utilization=$(echo "$swift_result" | cut -d'|' -f1)
     resets_at=$(echo "$swift_result" | cut -d'|' -f2)
 
+    # Parse reset epoch once for shared use by pace marker and reset time display
+      reset_epoch=""
+      if [ -n "$resets_at" ] && [ "$resets_at" != "null" ]; then
+        iso_time=$(echo "$resets_at" | sed 's/\\.[0-9]*Z$//')
+        reset_epoch=$(date -ju -f "%Y-%m-%dT%H:%M:%S" "$iso_time" "+%s" 2>/dev/null)
+      fi
+
     if [ -n "$utilization" ] && [ "$utilization" != "ERROR" ]; then
       if [ "$utilization" -le 10 ]; then
         usage_color="$LEVEL_1"
@@ -374,10 +403,48 @@ if [ "$show_usage" = "1" ]; then
         progress_bar=""
       fi
 
+      # Pace marker: insert colored │ at elapsed time position
+      if [ "$show_pace_marker" = "1" ] && [ "$show_bar" = "1" ] && [ -n "$reset_epoch" ]; then
+        now_epoch=$(date +%s)
+        remaining=$((reset_epoch - now_epoch))
+        if [ $remaining -gt 0 ] && [ $remaining -lt 18000 ]; then
+          elapsed_secs=$((18000 - remaining))
+          marker_pos=$((elapsed_secs * 10 / 18000))
+          [ $marker_pos -gt 9 ] && marker_pos=9
+          [ $marker_pos -lt 0 ] && marker_pos=0
+
+          # Compute 6-tier pace color (integer math, >= 15% elapsed = 2700s)
+          pace_color=""
+          if [ $elapsed_secs -ge 2700 ]; then
+            projected_pct=$((utilization * 18000 / elapsed_secs))
+            if [ $projected_pct -lt 50 ]; then
+              pace_color="$PACE_COMFORTABLE"
+            elif [ $projected_pct -lt 75 ]; then
+              pace_color="$PACE_ON_TRACK"
+            elif [ $projected_pct -lt 90 ]; then
+              pace_color="$PACE_WARMING"
+            elif [ $projected_pct -lt 100 ]; then
+              pace_color="$PACE_PRESSING"
+            elif [ $projected_pct -lt 120 ]; then
+              pace_color="$PACE_CRITICAL"
+            else
+              pace_color="$PACE_RUNAWAY"
+            fi
+          fi
+
+          if [ -n "$pace_color" ]; then
+            # Replace bar character at marker_pos with colored │
+            # progress_bar = " " + 10 block chars; marker_pos+1 is the target index
+            left="${progress_bar:0:$((marker_pos + 1))}"
+            right="${progress_bar:$((marker_pos + 2))}"
+            progress_bar="${left}${pace_color}│${RESET}${right}"
+          fi
+        fi
+      fi
+
       reset_time_display=""
-      if [ "$show_reset" = "1" ] && [ -n "$resets_at" ] && [ "$resets_at" != "null" ]; then
-        iso_time=$(echo "$resets_at" | sed 's/\\.[0-9]*Z$//')
-        epoch=$(date -ju -f "%Y-%m-%dT%H:%M:%S" "$iso_time" "+%s" 2>/dev/null)
+      if [ "$show_reset" = "1" ] && [ -n "$reset_epoch" ]; then
+        epoch=$reset_epoch
 
         if [ -n "$epoch" ]; then
           # Round to nearest minute to prevent pinballing (e.g., 6:59:45 -> 7:00)
@@ -544,6 +611,7 @@ printf "%s\\n" "$output"
         contextAsTokens: Bool,
         showUsage: Bool,
         showProgressBar: Bool,
+        showPaceMarker: Bool = true,
         showResetTime: Bool,
         use24HourTime: Bool = false,
         showUsageLabel: Bool = true,
@@ -574,6 +642,7 @@ SHOW_CONTEXT=\(showContext ? "1" : "0")
 CONTEXT_AS_TOKENS=\(contextAsTokens ? "1" : "0")
 SHOW_USAGE=\(showUsage ? "1" : "0")
 SHOW_PROGRESS_BAR=\(showProgressBar ? "1" : "0")
+SHOW_PACE_MARKER=\(showPaceMarker ? "1" : "0")
 SHOW_RESET_TIME=\(showResetTime ? "1" : "0")
 USE_24_HOUR_TIME=\(use24HourTime ? "1" : "0")
 SHOW_USAGE_LABEL=\(showUsageLabel ? "1" : "0")

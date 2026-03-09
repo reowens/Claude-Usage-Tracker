@@ -87,6 +87,18 @@ struct AppearanceSettingsView: View {
                         )
 
                         SettingToggle(
+                            title: "appearance.show_pace_marker_title".localized,
+                            description: "appearance.show_pace_marker_description".localized,
+                            isOn: Binding(
+                                get: { configuration.showPaceMarker },
+                                set: { newValue in
+                                    configuration.showPaceMarker = newValue
+                                    saveConfiguration()
+                                }
+                            )
+                        )
+
+                        SettingToggle(
                             title: "appearance.pace_coloring_title".localized,
                             description: "appearance.pace_coloring_description".localized,
                             isOn: Binding(

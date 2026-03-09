@@ -19,6 +19,7 @@ struct ClaudeCodeView: View {
     @State private var contextAsTokens: Bool = SharedDataStore.shared.loadStatuslineContextAsTokens()
     @State private var showUsage: Bool = SharedDataStore.shared.loadStatuslineShowUsage()
     @State private var showProgressBar: Bool = SharedDataStore.shared.loadStatuslineShowProgressBar()
+    @State private var showPaceMarker: Bool = SharedDataStore.shared.loadStatuslineShowPaceMarker()
     @State private var showResetTime: Bool = SharedDataStore.shared.loadStatuslineShowResetTime()
     @State private var showProfile: Bool = SharedDataStore.shared.loadStatuslineShowProfile()
     @State private var use24HourTime: Bool = SharedDataStore.shared.loadStatuslineUse24HourTime()
@@ -138,6 +139,15 @@ struct ClaudeCodeView: View {
                                             title: "claudecode.component_progressbar".localized,
                                             isOn: $showProgressBar
                                         )
+
+                                        if showProgressBar {
+                                            SettingToggle(
+                                                title: "claudecode.component_pace_marker".localized,
+                                                description: "claudecode.pace_marker_info".localized,
+                                                isOn: $showPaceMarker
+                                            )
+                                            .padding(.leading, DesignTokens.Spacing.cardPadding)
+                                        }
 
                                         SettingToggle(
                                             title: "claudecode.component_resettime".localized,
@@ -506,6 +516,7 @@ struct ClaudeCodeView: View {
         SharedDataStore.shared.saveStatuslineContextAsTokens(contextAsTokens)
         SharedDataStore.shared.saveStatuslineShowUsage(showUsage)
         SharedDataStore.shared.saveStatuslineShowProgressBar(showProgressBar)
+        SharedDataStore.shared.saveStatuslineShowPaceMarker(showPaceMarker)
         SharedDataStore.shared.saveStatuslineShowResetTime(showResetTime)
         SharedDataStore.shared.saveStatuslineShowProfile(showProfile)
         SharedDataStore.shared.saveStatuslineUse24HourTime(use24HourTime)
@@ -526,6 +537,7 @@ struct ClaudeCodeView: View {
                 contextAsTokens: contextAsTokens,
                 showUsage: showUsage,
                 showProgressBar: showProgressBar,
+                showPaceMarker: showPaceMarker,
                 showResetTime: showResetTime,
                 use24HourTime: use24HourTime,
                 showUsageLabel: showUsageLabel,

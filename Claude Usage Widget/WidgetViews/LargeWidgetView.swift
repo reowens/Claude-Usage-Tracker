@@ -37,34 +37,43 @@ struct LargeWidgetView: View {
                     GridItem(.flexible(), spacing: WidgetDesign.Spacing.cardSpacing)
                 ], spacing: WidgetDesign.Spacing.cardSpacing) {
                     // Session Usage
+                    let sessionPace = usage.paceData(for: .session)
                     MetricTile(
                         title: "Session",
                         percentage: usage.sessionPercentage,
                         subtitle: WidgetDateFormatter.shortTimeString(from: usage.sessionResetTime),
                         icon: "clock.fill",
                         colorMode: entry.colorMode,
-                        customColorHex: entry.customColorHex
+                        customColorHex: entry.customColorHex,
+                        elapsedFraction: sessionPace?.elapsed,
+                        paceStatus: sessionPace?.pace
                     )
 
                     // Weekly Usage
+                    let weeklyPace = usage.paceData(for: .weekly)
                     MetricTile(
                         title: "Weekly",
                         percentage: usage.weeklyPercentage,
                         subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                         icon: "calendar",
                         colorMode: entry.colorMode,
-                        customColorHex: entry.customColorHex
+                        customColorHex: entry.customColorHex,
+                        elapsedFraction: weeklyPace?.elapsed,
+                        paceStatus: weeklyPace?.pace
                     )
 
                     // Opus Usage - show Extra if Opus is 0% and extra data exists
+                    let opusPace = usage.paceData(for: .opus)
                     if usage.opusPercentage > 0 {
                         MetricTile(
                             title: "Opus",
                             percentage: usage.opusPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                             icon: "star.fill",
-                                colorMode: entry.colorMode,
-                            customColorHex: entry.customColorHex
+                            colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex,
+                            elapsedFraction: opusPace?.elapsed,
+                            paceStatus: opusPace?.pace
                         )
                     } else if let extraPercentage = usage.extraPercentage {
                         MetricTile(
@@ -81,20 +90,25 @@ struct LargeWidgetView: View {
                             percentage: usage.opusPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                             icon: "star.fill",
-                                colorMode: entry.colorMode,
-                            customColorHex: entry.customColorHex
+                            colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex,
+                            elapsedFraction: opusPace?.elapsed,
+                            paceStatus: opusPace?.pace
                         )
                     }
 
                     // Sonnet Usage - show Extra if Sonnet is 0% and extra data exists (and wasn't shown for Opus)
+                    let sonnetPace = usage.paceData(for: .sonnet)
                     if usage.sonnetPercentage > 0 {
                         MetricTile(
                             title: "Sonnet",
                             percentage: usage.sonnetPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                             icon: "bolt.fill",
-                                colorMode: entry.colorMode,
-                            customColorHex: entry.customColorHex
+                            colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex,
+                            elapsedFraction: sonnetPace?.elapsed,
+                            paceStatus: sonnetPace?.pace
                         )
                     } else if let extraPercentage = usage.extraPercentage, usage.opusPercentage > 0 {
                         // Only show extra here if we didn't already show it for Opus
@@ -112,8 +126,10 @@ struct LargeWidgetView: View {
                             percentage: usage.sonnetPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
                             icon: "bolt.fill",
-                                colorMode: entry.colorMode,
-                            customColorHex: entry.customColorHex
+                            colorMode: entry.colorMode,
+                            customColorHex: entry.customColorHex,
+                            elapsedFraction: sonnetPace?.elapsed,
+                            paceStatus: sonnetPace?.pace
                         )
                     }
                 }
@@ -143,7 +159,7 @@ struct LargeWidgetView: View {
                         // API progress ring
                         ZStack {
                             Circle()
-                                .stroke(ringBackgroundColor, lineWidth: 5)
+                                .stroke(Color.white.opacity(WidgetDesign.Colors.glassProgressBg), lineWidth: 5)
 
                             Circle()
                                 .trim(from: 0, to: min(apiUsage.usagePercentage / 100, 1.0))
@@ -171,10 +187,6 @@ struct LargeWidgetView: View {
 
     private var dividerColor: Color {
         Color.primary.opacity(WidgetDesign.Colors.glassDivider)
-    }
-
-    private var ringBackgroundColor: Color {
-        Color.white.opacity(0.15)  // Very subtle background for ring track
     }
 
     private var noDataView: some View {
@@ -223,6 +235,8 @@ struct MetricTile: View {
     let icon: String
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
+    var elapsedFraction: Double? = nil
+    var paceStatus: WidgetPaceStatus? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -243,11 +257,20 @@ struct MetricTile: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(progressBackgroundColor)
+                        .fill(Color.white.opacity(WidgetDesign.Colors.glassProgressBg))
 
                     RoundedRectangle(cornerRadius: 4)
                         .fill(statusColor)
                         .frame(width: geometry.size.width * min(percentage / 100, 1.0))
+
+                    // Pace marker tick
+                    if let fraction = elapsedFraction, let pace = paceStatus {
+                        let tickX = geometry.size.width * fraction
+                        RoundedRectangle(cornerRadius: 0.5)
+                            .fill(pace.color)
+                            .frame(width: 1.5, height: WidgetDesign.Spacing.progressHeight)
+                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight / 2)
+                    }
                 }
             }
             .frame(height: WidgetDesign.Spacing.progressHeight)
@@ -257,20 +280,10 @@ struct MetricTile: View {
                 .foregroundColor(secondaryTextColor)
         }
         .padding(WidgetDesign.Spacing.cardPadding)
-        .background(tileBackground)
-        .cornerRadius(WidgetDesign.Spacing.cardCornerRadius)
+        .widgetCardBackground()
     }
 
     // MARK: - Colors
-
-    private var tileBackground: some View {
-        // Use very subtle white tint for glass - maintains desktop transparency
-        Color.white.opacity(0.05)
-    }
-
-    private var progressBackgroundColor: Color {
-        Color.white.opacity(0.15)  // Very subtle background for progress track
-    }
 
     private var secondaryTextColor: Color {
         Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)

@@ -357,6 +357,8 @@
 "claudecode.component_context_tokens" = "Show as tokens (instead of %)";
 "claudecode.component_usage" = "Usage statistics";
 "claudecode.component_progressbar" = "Progress bar";
+"claudecode.component_pace_marker" = "Pace marker";
+"claudecode.pace_marker_info" = "Shows a colored tick at the elapsed time position";
 "claudecode.component_resettime" = "Reset time";
 "claudecode.requirement_sessionkey" = "• Session key configured in Credentials → Claude.ai tab";
 "claudecode.requirement_restart" = "• Changes appear after 1-2 prompts, or restart Claude Code";
@@ -440,6 +442,8 @@
 "appearance.show_remaining_description" = "Display remaining capacity instead of used percentage (like macOS battery)";
 "appearance.show_time_marker_title" = "Show Time-Elapsed Marker";
 "appearance.show_time_marker_description" = "Display a tick mark on progress bars showing how far through the time period you are";
+"appearance.show_pace_marker_title" = "Color Marker by Pace";
+"appearance.show_pace_marker_description" = "Color the time marker by projected usage pace (green to purple). Shows a pace dot on styles without bars.";
 "appearance.pace_coloring_title" = "Pace-Aware Coloring";
 "appearance.pace_coloring_description" = "Color indicators based on projected usage pace. When off, colors reflect current usage only.";
 "appearance.multiprofile_locked_title" = "Appearance Settings Locked";

@@ -25,6 +25,7 @@ class SharedDataStore {
         static let statuslineContextAsTokens = "statuslineContextAsTokens"
         static let statuslineShowUsage = "statuslineShowUsage"
         static let statuslineShowProgressBar = "statuslineShowProgressBar"
+        static let statuslineShowPaceMarker = "statuslineShowPaceMarker"
         static let statuslineShowResetTime = "statuslineShowResetTime"
         static let statuslineUse24HourTime = "statuslineUse24HourTime"
         static let statuslineShowUsageLabel = "statuslineShowUsageLabel"
@@ -145,6 +146,17 @@ class SharedDataStore {
             return true
         }
         return defaults.bool(forKey: Keys.statuslineShowProgressBar)
+    }
+
+    func saveStatuslineShowPaceMarker(_ show: Bool) {
+        defaults.set(show, forKey: Keys.statuslineShowPaceMarker)
+    }
+
+    func loadStatuslineShowPaceMarker() -> Bool {
+        if defaults.object(forKey: Keys.statuslineShowPaceMarker) == nil {
+            return true
+        }
+        return defaults.bool(forKey: Keys.statuslineShowPaceMarker)
     }
 
     func saveStatuslineShowResetTime(_ show: Bool) {

@@ -338,6 +338,8 @@
 "claudecode.component_context_tokens" = "Afficher en tokens (au lieu de %)";
 "claudecode.component_usage" = "Statistiques d'utilisation";
 "claudecode.component_progressbar" = "Barre de progression";
+"claudecode.component_pace_marker" = "Marqueur de rythme";
+"claudecode.pace_marker_info" = "Affiche un repère coloré à la position du temps écoulé";
 "claudecode.component_resettime" = "Heure de réinitialisation";
 "claudecode.requirement_sessionkey" = "• Clé de session configurée dans Identifiants → onglet Claude.ai";
 "claudecode.requirement_restart" = "• Redémarrez Claude CLI après l'application des modifications";
@@ -409,6 +411,8 @@
 "appearance.show_remaining_description" = "Afficher la capacité restante au lieu du pourcentage utilisé (comme la batterie macOS)";
 "appearance.show_time_marker_title" = "Afficher le marqueur de temps écoulé";
 "appearance.show_time_marker_description" = "Afficher un repère sur les barres de progression indiquant la progression dans la période";
+"appearance.show_pace_marker_title" = "Colorer le marqueur par rythme";
+"appearance.show_pace_marker_description" = "Colore le marqueur de temps selon le rythme d'utilisation projeté (vert à violet). Affiche un point de rythme sur les styles sans barres.";
 "appearance.pace_coloring_title" = "Coloration selon le rythme";
 "appearance.pace_coloring_description" = "Colorer les indicateurs selon le rythme d'utilisation projeté. Désactivé, les couleurs reflètent uniquement l'utilisation actuelle.";
 "appearance.multiprofile_locked_title" = "Paramètres d'Apparence Verrouillés";

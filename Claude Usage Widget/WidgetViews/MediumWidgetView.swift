@@ -120,11 +120,20 @@ struct UsageCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(progressBackgroundColor)
+                        .fill(Color.white.opacity(WidgetDesign.Colors.glassProgressBg))
 
                     RoundedRectangle(cornerRadius: 4)
                         .fill(statusColor)
                         .frame(width: geometry.size.width * min(metricData.percentage / 100, 1.0))
+
+                    // Pace marker tick
+                    if let paceData = usage.paceData(for: metric) {
+                        let tickX = geometry.size.width * paceData.elapsed
+                        RoundedRectangle(cornerRadius: 0.5)
+                            .fill(paceData.pace.color)
+                            .frame(width: 1.5, height: WidgetDesign.Spacing.progressHeight)
+                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight / 2)
+                    }
                 }
             }
             .frame(height: WidgetDesign.Spacing.progressHeight)
@@ -137,8 +146,7 @@ struct UsageCard: View {
                 .minimumScaleFactor(0.8)
         }
         .padding(WidgetDesign.Spacing.cardPadding)
-        .background(cardBackground)
-        .cornerRadius(WidgetDesign.Spacing.cardCornerRadius)
+        .widgetCardBackground()
         .frame(maxWidth: .infinity)
     }
 
@@ -197,15 +205,6 @@ struct UsageCard: View {
     }
 
     // MARK: - Colors
-
-    private var cardBackground: some View {
-        // Use very subtle white tint for glass - maintains desktop transparency
-        Color.white.opacity(0.05)
-    }
-
-    private var progressBackgroundColor: Color {
-        Color.white.opacity(0.15)  // Very subtle background for progress track
-    }
 
     private var secondaryTextColor: Color {
         Color.primary.opacity(WidgetDesign.Colors.glassSecondaryText)

@@ -403,12 +403,12 @@ if [ "$show_usage" = "1" ]; then
           if [ $elapsed_secs -ge 540 ] && [ "$utilization" -gt 0 ]; then
             # projected_pct = utilization * 18000 / elapsed_secs (integer math)
             projected_pct=$((utilization * 18000 / elapsed_secs))
-            if [ $projected_pct -lt 75 ]; then
-              usage_color="$PACE_COMFORTABLE"  # green — safe
-            elif [ $projected_pct -lt 95 ]; then
-              usage_color="$PACE_WARMING"      # yellow — moderate
+            if [ $projected_pct -lt 100 ]; then
+              usage_color="$PACE_COMFORTABLE"  # green — under budget
+            elif [ $projected_pct -lt 115 ]; then
+              usage_color="$PACE_WARMING"      # yellow — near limit
             else
-              usage_color="$PACE_CRITICAL"     # red — critical
+              usage_color="$PACE_CRITICAL"     # red — over budget
             fi
           fi
         fi
@@ -456,15 +456,15 @@ if [ "$show_usage" = "1" ]; then
           pace_color=""
           if [ $elapsed_secs -ge 540 ]; then
             projected_pct=$((utilization * 18000 / elapsed_secs))
-            if [ $projected_pct -lt 50 ]; then
+            if [ $projected_pct -lt 75 ]; then
               pace_color="$PACE_COMFORTABLE"
-            elif [ $projected_pct -lt 75 ]; then
-              pace_color="$PACE_ON_TRACK"
-            elif [ $projected_pct -lt 90 ]; then
-              pace_color="$PACE_WARMING"
             elif [ $projected_pct -lt 100 ]; then
-              pace_color="$PACE_PRESSING"
+              pace_color="$PACE_ON_TRACK"
+            elif [ $projected_pct -lt 110 ]; then
+              pace_color="$PACE_WARMING"
             elif [ $projected_pct -lt 120 ]; then
+              pace_color="$PACE_PRESSING"
+            elif [ $projected_pct -lt 135 ]; then
               pace_color="$PACE_CRITICAL"
             else
               pace_color="$PACE_RUNAWAY"

@@ -498,7 +498,7 @@ final class MenuBarIconRenderer {
 
         let textSize = fullText.size(withAttributes: attributes)
         let hasPaceDot = showPaceMarker && paceStatus != nil
-        let paceDotExtra: CGFloat = hasPaceDot ? 7 : 0  // dot(3) + gaps(2+2)
+        let paceDotExtra: CGFloat = hasPaceDot ? 8 : 0  // dot(4) + gaps(2+2)
         let image = NSImage(size: NSSize(width: textSize.width + 2 + paceDotExtra, height: 18))
 
         image.lockFocus()
@@ -509,7 +509,7 @@ final class MenuBarIconRenderer {
 
         // Pace dot after text
         if showPaceMarker, let pace = paceStatus {
-            let dotSize: CGFloat = 3.0
+            let dotSize: CGFloat = 4.0
             let dotX = 2 + textSize.width + 2
             let dotY = (18 - dotSize) / 2
             let dotPath = NSBezierPath(ovalIn: NSRect(x: dotX, y: dotY, width: dotSize, height: dotSize))
@@ -633,7 +633,7 @@ final class MenuBarIconRenderer {
         let dotSize: CGFloat = 8
         let spacing: CGFloat = showIconName ? 1 : 0
         let hasPaceDot = showPaceMarker && paceStatus != nil
-        let paceDotExtra: CGFloat = hasPaceDot ? 5 : 0  // gap(2) + dot(3)
+        let paceDotExtra: CGFloat = hasPaceDot ? 6 : 0  // gap(2) + dot(4)
         let totalWidth = prefixWidth + spacing + dotSize + paceDotExtra + 1
         let height: CGFloat = 18
 
@@ -673,7 +673,7 @@ final class MenuBarIconRenderer {
 
         // Pace dot next to main dot
         if showPaceMarker, let pace = paceStatus {
-            let paceDotSize: CGFloat = 3.0
+            let paceDotSize: CGFloat = 4.0
             let paceDotX = xOffset + dotSize + 2
             let paceDotY = (height - paceDotSize) / 2
             let paceDotPath = NSBezierPath(ovalIn: NSRect(x: paceDotX, y: paceDotY, width: paceDotSize, height: paceDotSize))
@@ -1129,7 +1129,7 @@ final class MenuBarIconRenderer {
         let labelHeight: CGFloat = profileInitial != nil ? 10 : 0
         let spacing: CGFloat = profileInitial != nil ? 1 : 0
         let hasPaceDot = showPaceMarker && paceStatus != nil
-        let paceDotExtra: CGFloat = hasPaceDot ? 5 : 0  // gap(2) + dot(3)
+        let paceDotExtra: CGFloat = hasPaceDot ? 6 : 0  // gap(2) + dot(4)
 
         let totalHeight = dotSize + spacing + labelHeight
         let totalWidth = max(dotSize + paceDotExtra, 16)
@@ -1156,7 +1156,7 @@ final class MenuBarIconRenderer {
 
         // Pace dot next to main dot
         if showPaceMarker, let pace = paceStatus {
-            let paceDotSize: CGFloat = 3.0
+            let paceDotSize: CGFloat = 4.0
             let paceDotX = mainDotX + dotSize + 2
             let paceDotY = totalHeight - dotSize + (dotSize - paceDotSize) / 2
             let paceDotPath = NSBezierPath(ovalIn: NSRect(x: paceDotX, y: paceDotY, width: paceDotSize, height: paceDotSize))
@@ -1272,7 +1272,7 @@ final class MenuBarIconRenderer {
 
         let textSize = attributed.size()
         let hasPaceDot = showPaceMarker && sessionPaceStatus != nil
-        let paceDotExtra: CGFloat = hasPaceDot ? 5 : 0  // gap(2) + dot(3)
+        let paceDotExtra: CGFloat = hasPaceDot ? 6 : 0  // gap(2) + dot(4)
         let labelHeight: CGFloat = profileName != nil ? 10 : 0
         let labelSpacing: CGFloat = profileName != nil ? 1 : 0
         let totalWidth = max(textSize.width + 2 + paceDotExtra, profileName != nil ? CGFloat(String(profileName!.prefix(3)).count) * 6 + 4 : 0)
@@ -1290,7 +1290,7 @@ final class MenuBarIconRenderer {
 
         // Pace dot after the percentage text
         if showPaceMarker, let pace = sessionPaceStatus {
-            let dotSize: CGFloat = 3.0
+            let dotSize: CGFloat = 4.0
             let dotX = textX + textSize.width + 2
             let dotY = textY + (textSize.height - dotSize) / 2
             let dotPath = NSBezierPath(ovalIn: NSRect(x: dotX, y: dotY, width: dotSize, height: dotSize))
@@ -1382,8 +1382,8 @@ final class MenuBarIconRenderer {
             color = menuBarForegroundColor(isDarkMode: isDarkMode)
         }
         color.setStroke()
-        path.lineWidth = 1.5
-        path.lineCapStyle = .butt
+        path.lineWidth = 2.0
+        path.lineCapStyle = .round
         path.stroke()
     }
 

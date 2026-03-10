@@ -32,7 +32,9 @@ class SharedDataStore {
         static let statuslineShowResetLabel = "statuslineShowResetLabel"
         static let statuslineColorMode = "statuslineColorMode"
         static let statuslineSingleColorHex = "statuslineSingleColorHex"
+        static let statuslineShowContextLabel = "statuslineShowContextLabel"
         static let statuslineShowProfile = "statuslineShowProfile"
+        static let statuslinePaceMarkerStepColors = "statuslinePaceMarkerStepColors"
 
         // Widget Settings
         static let smallWidgetMetric = "smallWidgetMetric"
@@ -77,15 +79,15 @@ class SharedDataStore {
         static let timeFormatPreference = "timeFormatPreference"
     }
 
+    /// App Groups UserDefaults for sharing widget data across processes
+    private let widgetDefaults: UserDefaults?
+
     init() {
-        // Use App Groups UserDefaults for sharing data with widgets
-        if let groupDefaults = UserDefaults(suiteName: Constants.appGroupIdentifier) {
-            self.defaults = groupDefaults
-            LoggingService.shared.log("SharedDataStore: Using App Groups shared container")
-        } else {
-            self.defaults = UserDefaults.standard
-            LoggingService.shared.log("SharedDataStore: Fallback to standard app container (App Groups unavailable)")
-        }
+        // Keep standard UserDefaults for all app settings (preserves existing data)
+        self.defaults = UserDefaults.standard
+        // App Groups container is only used for writing widget-specific data
+        self.widgetDefaults = UserDefaults(suiteName: Constants.appGroupIdentifier)
+        LoggingService.shared.log("SharedDataStore: Using standard defaults, widget sync via App Groups")
     }
 
     // MARK: - Language & Localization
@@ -166,6 +168,17 @@ class SharedDataStore {
         return defaults.bool(forKey: Keys.statuslineShowPaceMarker)
     }
 
+    func saveStatuslinePaceMarkerStepColors(_ useStepColors: Bool) {
+        defaults.set(useStepColors, forKey: Keys.statuslinePaceMarkerStepColors)
+    }
+
+    func loadStatuslinePaceMarkerStepColors() -> Bool {
+        if defaults.object(forKey: Keys.statuslinePaceMarkerStepColors) == nil {
+            return true  // Default to step colors
+        }
+        return defaults.bool(forKey: Keys.statuslinePaceMarkerStepColors)
+    }
+
     func saveStatuslineShowResetTime(_ show: Bool) {
         defaults.set(show, forKey: Keys.statuslineShowResetTime)
     }
@@ -208,6 +221,17 @@ class SharedDataStore {
             return true  // Default to showing labels
         }
         return defaults.bool(forKey: Keys.statuslineShowResetLabel)
+    }
+
+    func saveStatuslineShowContextLabel(_ show: Bool) {
+        defaults.set(show, forKey: Keys.statuslineShowContextLabel)
+    }
+
+    func loadStatuslineShowContextLabel() -> Bool {
+        if defaults.object(forKey: Keys.statuslineShowContextLabel) == nil {
+            return true  // Default to showing label
+        }
+        return defaults.bool(forKey: Keys.statuslineShowContextLabel)
     }
 
     func saveStatuslineColorMode(_ mode: StatuslineColorMode) {
@@ -265,10 +289,15 @@ class SharedDataStore {
 
     // MARK: - Widget Settings
 
+    /// Write a value to both standard and App Groups UserDefaults
+    private func syncToWidget(key: String, value: Any) {
+        widgetDefaults?.set(value, forKey: key)
+        widgetDefaults?.synchronize()
+    }
+
     func saveSmallWidgetMetric(_ metric: SmallWidgetMetric) {
         defaults.set(metric.rawValue, forKey: Keys.smallWidgetMetric)
-        defaults.synchronize()  // Force sync before widget reads
-        // Also write to file for reliable cross-process sync
+        syncToWidget(key: Keys.smallWidgetMetric, value: metric.rawValue)
         saveWidgetSettingsToFile()
     }
 
@@ -282,7 +311,7 @@ class SharedDataStore {
 
     func saveMediumWidgetLeftMetric(_ metric: SmallWidgetMetric) {
         defaults.set(metric.rawValue, forKey: Keys.mediumWidgetLeftMetric)
-        defaults.synchronize()  // Force sync before widget reads
+        syncToWidget(key: Keys.mediumWidgetLeftMetric, value: metric.rawValue)
         saveWidgetSettingsToFile()
     }
 
@@ -296,7 +325,7 @@ class SharedDataStore {
 
     func saveMediumWidgetRightMetric(_ metric: SmallWidgetMetric) {
         defaults.set(metric.rawValue, forKey: Keys.mediumWidgetRightMetric)
-        defaults.synchronize()  // Force sync before widget reads
+        syncToWidget(key: Keys.mediumWidgetRightMetric, value: metric.rawValue)
         saveWidgetSettingsToFile()
     }
 
@@ -310,8 +339,7 @@ class SharedDataStore {
 
     func saveWidgetColorMode(_ mode: WidgetColorMode) {
         defaults.set(mode.rawValue, forKey: Keys.widgetColorMode)
-        defaults.synchronize()  // Force sync before widget reads
-        // Also write to file for reliable cross-process sync
+        syncToWidget(key: Keys.widgetColorMode, value: mode.rawValue)
         saveWidgetSettingsToFile()
     }
 
@@ -325,8 +353,7 @@ class SharedDataStore {
 
     func saveWidgetSingleColorHex(_ hex: String) {
         defaults.set(hex, forKey: Keys.widgetSingleColorHex)
-        defaults.synchronize()  // Force sync before widget reads
-        // Also write to file for reliable cross-process sync
+        syncToWidget(key: Keys.widgetSingleColorHex, value: hex)
         saveWidgetSettingsToFile()
     }
 
@@ -336,7 +363,7 @@ class SharedDataStore {
 
     func saveWidgetShowPaceMarker(_ show: Bool) {
         defaults.set(show, forKey: Keys.widgetShowPaceMarker)
-        defaults.synchronize()
+        syncToWidget(key: Keys.widgetShowPaceMarker, value: show)
         saveWidgetSettingsToFile()
     }
 
@@ -349,7 +376,7 @@ class SharedDataStore {
 
     func saveWidgetRefreshInterval(_ minutes: Int) {
         defaults.set(minutes, forKey: Keys.widgetRefreshInterval)
-        defaults.synchronize()
+        syncToWidget(key: Keys.widgetRefreshInterval, value: minutes)
         saveWidgetSettingsToFile()
     }
 
@@ -360,8 +387,7 @@ class SharedDataStore {
 
     func saveExtraUsageDisplayFormat(_ format: ExtraUsageDisplayFormat) {
         defaults.set(format.rawValue, forKey: Keys.extraUsageDisplayFormat)
-        defaults.synchronize()  // Force sync before widget reads
-        // Also write to file for reliable cross-process sync
+        syncToWidget(key: Keys.extraUsageDisplayFormat, value: format.rawValue)
         saveWidgetSettingsToFile()
     }
 

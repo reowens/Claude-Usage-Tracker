@@ -21,9 +21,10 @@ enum WidgetPaceStatus: Int, Comparable, CaseIterable {
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 
     /// Calculate pace status from current usage and elapsed time.
-    /// Returns nil when insufficient data (< 15% elapsed, period over, or no usage).
+    /// Returns nil when insufficient data (< 3% elapsed or period over).
     static func calculate(usedPercentage: Double, elapsedFraction: Double) -> WidgetPaceStatus? {
-        guard elapsedFraction >= 0.15, elapsedFraction < 1.0, usedPercentage > 0 else { return nil }
+        guard elapsedFraction >= 0.03, elapsedFraction < 1.0 else { return nil }
+        guard usedPercentage > 0 else { return .comfortable }
         let projected = (usedPercentage / 100.0) / elapsedFraction
         switch projected {
         case ..<0.50:     return .comfortable

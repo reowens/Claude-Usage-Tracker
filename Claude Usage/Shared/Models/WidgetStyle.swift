@@ -34,11 +34,11 @@ enum StatuslineColorMode: String, Codable, CaseIterable {
     var description: String {
         switch self {
         case .colored:
-            return "Threshold-based colors by usage level"
+            return "Threshold-based colors"
         case .monochrome:
             return "Adapts to system theme"
         case .singleColor:
-            return "Custom color for all elements"
+            return "Custom color for all"
         }
     }
 

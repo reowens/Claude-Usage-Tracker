@@ -20,10 +20,12 @@ struct ClaudeCodeView: View {
     @State private var showUsage: Bool = SharedDataStore.shared.loadStatuslineShowUsage()
     @State private var showProgressBar: Bool = SharedDataStore.shared.loadStatuslineShowProgressBar()
     @State private var showPaceMarker: Bool = SharedDataStore.shared.loadStatuslineShowPaceMarker()
+    @State private var paceMarkerStepColors: Bool = SharedDataStore.shared.loadStatuslinePaceMarkerStepColors()
     @State private var showResetTime: Bool = SharedDataStore.shared.loadStatuslineShowResetTime()
     @State private var showProfile: Bool = SharedDataStore.shared.loadStatuslineShowProfile()
     @State private var use24HourTime: Bool = SharedDataStore.shared.loadStatuslineUse24HourTime()
     @State private var showUsageLabel: Bool = SharedDataStore.shared.loadStatuslineShowUsageLabel()
+    @State private var showContextLabel: Bool = SharedDataStore.shared.loadStatuslineShowContextLabel()
     @State private var showResetLabel: Bool = SharedDataStore.shared.loadStatuslineShowResetLabel()
 
     // Appearance settings
@@ -81,169 +83,180 @@ struct ClaudeCodeView: View {
                         .fill(DesignTokens.Colors.cardBackground)
                 )
 
-                // Two-column layout: Components | Colors
-                HStack(alignment: .top, spacing: 16) {
-                    // Left: Display Components
-                    SettingsSectionCard(
-                        title: "ui.display_components".localized,
-                        subtitle: "Choose which elements to display"
-                    ) {
-                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.medium) {
-                            SettingToggle(
-                                title: "claudecode.component_directory".localized,
-                                isOn: $showDirectory
-                            )
+                // Color Mode Card
+                SettingsSectionCard(
+                    title: "Statusline Colors",
+                    subtitle: "Choose color display mode"
+                ) {
+                    HStack(spacing: DesignTokens.Spacing.small) {
+                        ForEach([StatuslineColorMode.colored, .monochrome, .singleColor], id: \.self) { mode in
+                            Button {
+                                colorMode = mode
+                                SharedDataStore.shared.saveStatuslineColorMode(mode)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: mode.icon)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(iconColorForMode(mode))
 
-                            SettingToggle(
-                                title: "claudecode.component_branch".localized,
-                                isOn: $showBranch
-                            )
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(mode.displayName)
+                                            .font(DesignTokens.Typography.body)
+                                            .foregroundColor(.primary)
 
-                            SettingToggle(
-                                title: "claudecode.component_model".localized,
-                                isOn: $showModel
-                            )
-
-                            SettingToggle(
-                                title: "claudecode.component_profile".localized,
-                                isOn: $showProfile
-                            )
-
-                            // Context with sub-option
-                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                                SettingToggle(
-                                    title: "claudecode.component_context".localized,
-                                    isOn: $showContext
-                                )
-
-                                if showContext {
-                                    SettingToggle(
-                                        title: "claudecode.component_context_tokens".localized,
-                                        description: "claudecode.context_info".localized,
-                                        isOn: $contextAsTokens
-                                    )
-                                    .padding(.leading, DesignTokens.Spacing.cardPadding)
-                                }
-                            }
-
-                            // Usage with sub-options
-                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                                SettingToggle(
-                                    title: "claudecode.component_usage".localized,
-                                    isOn: $showUsage
-                                )
-
-                                if showUsage {
-                                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                                        SettingToggle(
-                                            title: "claudecode.component_progressbar".localized,
-                                            isOn: $showProgressBar
-                                        )
-
-                                        if showProgressBar {
-                                            SettingToggle(
-                                                title: "claudecode.component_pace_marker".localized,
-                                                description: "claudecode.pace_marker_info".localized,
-                                                isOn: $showPaceMarker
-                                            )
-                                            .padding(.leading, DesignTokens.Spacing.cardPadding)
-                                        }
-
-                                        SettingToggle(
-                                            title: "claudecode.component_resettime".localized,
-                                            isOn: $showResetTime
-                                        )
-
-                                        if showResetTime {
-                                            SettingToggle(
-                                                title: "24-hour time format",
-                                                isOn: $use24HourTime
-                                            )
-                                            .padding(.leading, DesignTokens.Spacing.cardPadding)
-                                        }
-
-                                        Divider()
-
-                                        SettingToggle(
-                                            title: "Show \"Usage:\" label",
-                                            isOn: $showUsageLabel
-                                        )
-
-                                        if showResetTime {
-                                            SettingToggle(
-                                                title: "Show \"Reset:\" label",
-                                                isOn: $showResetLabel
-                                            )
-                                        }
+                                        Text(mode.description)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
                                     }
-                                    .padding(.leading, DesignTokens.Spacing.cardPadding)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Right: Color Mode Settings
-                    SettingsSectionCard(
-                        title: "Statusline Colors",
-                        subtitle: "Choose color display mode"
-                    ) {
-                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
-                            ForEach([StatuslineColorMode.colored, .monochrome, .singleColor], id: \.self) { mode in
-                                Button {
-                                    colorMode = mode
-                                    SharedDataStore.shared.saveStatuslineColorMode(mode)
-                                } label: {
-                                    HStack {
-                                        Image(systemName: colorMode == mode ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(colorMode == mode ? .accentColor : .secondary)
-
-                                        Image(systemName: mode.icon)
-                                            .font(.system(size: 14))
-                                            .foregroundColor(iconColorForMode(mode))
-                                            .frame(width: 20)
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(mode.displayName)
-                                                .font(DesignTokens.Typography.body)
-                                                .foregroundColor(.primary)
-
-                                            Text(mode.description)
-                                                .font(DesignTokens.Typography.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            if colorMode == .singleColor {
-                                HStack {
-                                    Spacer().frame(width: 20)
-
-                                    ColorPicker("Choose Color", selection: Binding(
-                                        get: { singleColor },
-                                        set: { newColor in
-                                            singleColor = newColor
-                                            SharedDataStore.shared.saveStatuslineSingleColorHex(newColor.toHex() ?? "#00BFFF")
-                                        }
-                                    ))
-                                    .labelsHidden()
-
-                                    Text("Custom statusline color")
-                                        .font(DesignTokens.Typography.caption)
-                                        .foregroundColor(.secondary)
 
                                     Spacer()
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.small)
+                                        .fill(colorMode == mode ? Color.accentColor.opacity(0.12) : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.Radius.small)
+                                        .strokeBorder(colorMode == mode ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.15), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if colorMode == .singleColor {
+                        HStack(spacing: DesignTokens.Spacing.small) {
+                            ColorPicker("Custom color", selection: Binding(
+                                get: { singleColor },
+                                set: { newColor in
+                                    singleColor = newColor
+                                    SharedDataStore.shared.saveStatuslineSingleColorHex(newColor.toHex() ?? "#00BFFF")
+                                }
+                            ))
+                            .font(DesignTokens.Typography.caption)
+
+                            Spacer()
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+
+                // Display Components
+                SettingsSectionCard(
+                    title: "ui.display_components".localized,
+                    subtitle: "Choose which elements to display"
+                ) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.medium) {
+                        SettingToggle(
+                            title: "claudecode.component_directory".localized,
+                            isOn: $showDirectory
+                        )
+
+                        SettingToggle(
+                            title: "claudecode.component_branch".localized,
+                            isOn: $showBranch
+                        )
+
+                        SettingToggle(
+                            title: "claudecode.component_model".localized,
+                            isOn: $showModel
+                        )
+
+                        SettingToggle(
+                            title: "claudecode.component_profile".localized,
+                            isOn: $showProfile
+                        )
+
+                        // Context with sub-option
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
+                            SettingToggle(
+                                title: "claudecode.component_context".localized,
+                                isOn: $showContext
+                            )
+
+                            if showContext {
+                                SettingToggle(
+                                    title: "claudecode.component_context_tokens".localized,
+                                    description: "claudecode.context_info".localized,
+                                    isOn: $contextAsTokens
+                                )
+                                .padding(.leading, DesignTokens.Spacing.cardPadding)
+                            }
+                        }
+
+                        // Usage with sub-options
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
+                            SettingToggle(
+                                title: "claudecode.component_usage".localized,
+                                isOn: $showUsage
+                            )
+
+                            if showUsage {
+                                VStack(alignment: .leading, spacing: DesignTokens.Spacing.small) {
+                                    SettingToggle(
+                                        title: "claudecode.component_progressbar".localized,
+                                        isOn: $showProgressBar
+                                    )
+
+                                    if showProgressBar {
+                                        SettingToggle(
+                                            title: "claudecode.component_pace_marker".localized,
+                                            description: "claudecode.pace_marker_info".localized,
+                                            isOn: $showPaceMarker
+                                        )
+                                        .padding(.leading, DesignTokens.Spacing.cardPadding)
+
+                                        if showPaceMarker {
+                                            SettingToggle(
+                                                title: "Pace tier colors",
+                                                description: "6-tier projected pace (green → purple)",
+                                                isOn: $paceMarkerStepColors
+                                            )
+                                            .padding(.leading, DesignTokens.Spacing.cardPadding * 2)
+                                        }
+                                    }
+
+                                    SettingToggle(
+                                        title: "claudecode.component_resettime".localized,
+                                        isOn: $showResetTime
+                                    )
+
+                                    if showResetTime {
+                                        SettingToggle(
+                                            title: "24-hour time format",
+                                            isOn: $use24HourTime
+                                        )
+                                        .padding(.leading, DesignTokens.Spacing.cardPadding)
+                                    }
+
+                                    Divider()
+
+                                    if showContext {
+                                        SettingToggle(
+                                            title: "Show \"Ctx:\" label",
+                                            isOn: $showContextLabel
+                                        )
+                                    }
+
+                                    SettingToggle(
+                                        title: "Show \"Usage:\" label",
+                                        isOn: $showUsageLabel
+                                    )
+
+                                    if showResetTime {
+                                        SettingToggle(
+                                            title: "Show \"Reset:\" label",
+                                            isOn: $showResetLabel
+                                        )
+                                    }
+                                }
+                                .padding(.leading, DesignTokens.Spacing.cardPadding)
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
 
                 // Action buttons + status
@@ -357,12 +370,78 @@ struct ClaudeCodeView: View {
             // Multi-color preview - each element gets its own color
             multiColorPreview
         } else {
-            // Single color preview (monochrome or single color)
-            Text(generatePreview())
+            // Single/mono color preview — split at pace marker if step colors enabled
+            let preview = generatePreview()
+            if showPaceMarker && paceMarkerStepColors && showProgressBar && showUsage,
+               let markerRange = preview.range(of: "┃") {
+                let usage = profileManager.activeProfile?.claudeUsage
+                let percentage = usage != nil ? Int(usage!.sessionPercentage) : 29
+                let paceColor = previewPaceColor(percentage: percentage)
+                HStack(spacing: 0) {
+                    Text(String(preview[preview.startIndex..<markerRange.lowerBound]))
+                        .foregroundColor(previewColor)
+                    Text("┃")
+                        .foregroundColor(paceColor)
+                    Text(String(preview[markerRange.upperBound...]))
+                        .foregroundColor(previewColor)
+                }
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(previewColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            } else {
+                Text(preview)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(previewColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+    }
+
+    // MARK: - Terminal-Matching Colors (ANSI standard)
+
+    /// Colors matching ANSI standard terminal colors used in the bash statusline script
+    private enum TerminalColors {
+        static let blue = Color(red: 0/255, green: 0/255, blue: 238/255)
+        static let green = Color(red: 0/255, green: 187/255, blue: 0/255)
+        static let yellow = Color(red: 187/255, green: 187/255, blue: 0/255)
+        static let magenta = Color(red: 187/255, green: 0/255, blue: 187/255)
+        static let cyan = Color(red: 0/255, green: 187/255, blue: 187/255)
+        static let gray = Color(red: 128/255, green: 128/255, blue: 128/255)
+
+        // 6-tier pace marker colors (ANSI 256-color palette)
+        static let paceComfortable = Color(red: 0/255, green: 175/255, blue: 0/255)
+        static let paceOnTrack = Color(red: 0/255, green: 175/255, blue: 175/255)
+        static let paceWarming = Color(red: 215/255, green: 175/255, blue: 0/255)
+        static let pacePressing = Color(red: 255/255, green: 135/255, blue: 0/255)
+        static let paceCritical = Color(red: 215/255, green: 0/255, blue: 0/255)
+        static let paceRunaway = Color(red: 175/255, green: 95/255, blue: 255/255)
+
+        // 10-level usage gradient (ANSI 256-color palette)
+        static func usageLevel(_ percentage: Int) -> Color {
+            switch percentage {
+            case 0...10:  return Color(red: 0/255, green: 95/255, blue: 0/255)
+            case 11...20: return Color(red: 0/255, green: 135/255, blue: 0/255)
+            case 21...30: return Color(red: 0/255, green: 175/255, blue: 0/255)
+            case 31...40: return Color(red: 135/255, green: 135/255, blue: 0/255)
+            case 41...50: return Color(red: 175/255, green: 175/255, blue: 0/255)
+            case 51...60: return Color(red: 215/255, green: 175/255, blue: 0/255)
+            case 61...70: return Color(red: 215/255, green: 135/255, blue: 0/255)
+            case 71...80: return Color(red: 215/255, green: 95/255, blue: 0/255)
+            case 81...90: return Color(red: 215/255, green: 0/255, blue: 0/255)
+            default:      return Color(red: 175/255, green: 0/255, blue: 0/255)
+            }
+        }
+
+        static func paceColor(for status: PaceStatus) -> Color {
+            switch status {
+            case .comfortable: return paceComfortable
+            case .onTrack:     return paceOnTrack
+            case .warming:     return paceWarming
+            case .pressing:    return pacePressing
+            case .critical:    return paceCritical
+            case .runaway:     return paceRunaway
+            }
         }
     }
 
@@ -370,52 +449,53 @@ struct ClaudeCodeView: View {
     private var multiColorPreview: some View {
         let usage = profileManager.activeProfile?.claudeUsage
         let percentage = usage != nil ? Int(usage!.sessionPercentage) : 29
-        let usageColor = colorForPercentage(Double(percentage))
+        let usageColor = TerminalColors.usageLevel(percentage)
 
         return HStack(spacing: 0) {
             if showDirectory {
                 Text("claude-usage")
-                    .foregroundColor(.cyan)
+                    .foregroundColor(TerminalColors.blue)
                 if showBranch || showModel || showProfile || showContext || showUsage {
-                    Text(" │ ").foregroundColor(.secondary)
+                    Text(" │ ").foregroundColor(TerminalColors.gray)
                 }
             }
 
             if showBranch {
                 Text("⎇ main")
-                    .foregroundColor(.green)
+                    .foregroundColor(TerminalColors.green)
                 if showModel || showProfile || showContext || showUsage {
-                    Text(" │ ").foregroundColor(.secondary)
+                    Text(" │ ").foregroundColor(TerminalColors.gray)
                 }
             }
 
             if showModel {
                 Text("Opus")
-                    .foregroundColor(.purple)
+                    .foregroundColor(TerminalColors.yellow)
                 if showProfile || showContext || showUsage {
-                    Text(" │ ").foregroundColor(.secondary)
+                    Text(" │ ").foregroundColor(TerminalColors.gray)
                 }
             }
 
             if showProfile {
                 let name = ProfileManager.shared.activeProfile?.name ?? "Profile"
                 Text(name)
-                    .foregroundColor(.orange)
+                    .foregroundColor(TerminalColors.magenta)
                 if showContext || showUsage {
-                    Text(" │ ").foregroundColor(.secondary)
+                    Text(" │ ").foregroundColor(TerminalColors.gray)
                 }
             }
 
             if showContext {
+                let ctxPrefix = showContextLabel ? "Ctx: " : ""
                 if contextAsTokens {
-                    Text("Ctx: 96K")
-                        .foregroundColor(.blue)
+                    Text("\(ctxPrefix)96K")
+                        .foregroundColor(TerminalColors.cyan)
                 } else {
-                    Text("Ctx: 48%")
-                        .foregroundColor(.blue)
+                    Text("\(ctxPrefix)48%")
+                        .foregroundColor(TerminalColors.cyan)
                 }
                 if showUsage {
-                    Text(" │ ").foregroundColor(.secondary)
+                    Text(" │ ").foregroundColor(TerminalColors.gray)
                 }
             }
 
@@ -427,9 +507,24 @@ struct ClaudeCodeView: View {
                 if showProgressBar {
                     let filledBlocks = max(0, min(10, (percentage + 5) / 10))
                     let emptyBlocks = 10 - filledBlocks
-                    let bar = String(repeating: "▓", count: filledBlocks) + String(repeating: "░", count: emptyBlocks)
-                    Text(" \(bar)")
-                        .foregroundColor(usageColor)
+
+                    if showPaceMarker {
+                        let markerPos = max(0, min(9, previewMarkerPosition))
+                        let paceColor = previewPaceColor(percentage: percentage)
+                        let fullBar = String(repeating: "▓", count: filledBlocks) + String(repeating: "░", count: emptyBlocks)
+                        let chars = Array(fullBar)
+
+                        Text(" " + String(chars.prefix(markerPos)))
+                            .foregroundColor(usageColor)
+                        Text("┃")
+                            .foregroundColor(paceColor)
+                        Text(String(chars.suffix(from: markerPos + 1)))
+                            .foregroundColor(usageColor)
+                    } else {
+                        let bar = String(repeating: "▓", count: filledBlocks) + String(repeating: "░", count: emptyBlocks)
+                        Text(" \(bar)")
+                            .foregroundColor(usageColor)
+                    }
                 }
 
                 if showResetTime {
@@ -485,6 +580,42 @@ struct ClaudeCodeView: View {
         }
     }
 
+    /// Marker position for preview (0-9), based on real elapsed time or demo
+    private var previewMarkerPosition: Int {
+        if let usage = profileManager.activeProfile?.claudeUsage {
+            let remaining = usage.sessionResetTime.timeIntervalSince(Date())
+            if remaining > 0 && remaining < 18000 {
+                let elapsed = 18000 - remaining
+                return max(0, min(9, Int(round(elapsed * 10.0 / 18000.0))))
+            }
+        }
+        return 6 // Demo: 60% elapsed
+    }
+
+    /// Pace color for the marker in preview, matching terminal ANSI colors
+    private func previewPaceColor(percentage: Int) -> Color {
+        guard paceMarkerStepColors else {
+            return TerminalColors.usageLevel(percentage)
+        }
+
+        let elapsedFraction: Double
+        if let usage = profileManager.activeProfile?.claudeUsage {
+            let remaining = usage.sessionResetTime.timeIntervalSince(Date())
+            if remaining > 0 && remaining < 18000 {
+                elapsedFraction = (18000 - remaining) / 18000
+            } else {
+                elapsedFraction = 0.6
+            }
+        } else {
+            elapsedFraction = 0.6
+        }
+
+        if let paceStatus = PaceStatus.calculate(usedPercentage: Double(percentage), elapsedFraction: elapsedFraction) {
+            return TerminalColors.paceColor(for: paceStatus)
+        }
+        return TerminalColors.usageLevel(percentage)
+    }
+
     // MARK: - Actions
 
     /// Applies the current configuration to Claude Code statusline.
@@ -517,9 +648,11 @@ struct ClaudeCodeView: View {
         SharedDataStore.shared.saveStatuslineShowUsage(showUsage)
         SharedDataStore.shared.saveStatuslineShowProgressBar(showProgressBar)
         SharedDataStore.shared.saveStatuslineShowPaceMarker(showPaceMarker)
+        SharedDataStore.shared.saveStatuslinePaceMarkerStepColors(paceMarkerStepColors)
         SharedDataStore.shared.saveStatuslineShowResetTime(showResetTime)
         SharedDataStore.shared.saveStatuslineShowProfile(showProfile)
         SharedDataStore.shared.saveStatuslineUse24HourTime(use24HourTime)
+        SharedDataStore.shared.saveStatuslineShowContextLabel(showContextLabel)
         SharedDataStore.shared.saveStatuslineShowUsageLabel(showUsageLabel)
         SharedDataStore.shared.saveStatuslineShowResetLabel(showResetLabel)
 
@@ -535,8 +668,10 @@ struct ClaudeCodeView: View {
                 showUsage: showUsage,
                 showProgressBar: showProgressBar,
                 showPaceMarker: showPaceMarker,
+                paceMarkerStepColors: paceMarkerStepColors,
                 showResetTime: showResetTime,
                 use24HourTime: use24HourTime,
+                showContextLabel: showContextLabel,
                 showUsageLabel: showUsageLabel,
                 showResetLabel: showResetLabel,
                 colorMode: colorMode,
@@ -590,10 +725,11 @@ struct ClaudeCodeView: View {
         }
 
         if showContext {
+            let ctxPrefix = showContextLabel ? "Ctx: " : ""
             if contextAsTokens {
-                parts.append("Ctx: 96K")
+                parts.append("\(ctxPrefix)96K")
             } else {
-                parts.append("Ctx: 48%")
+                parts.append("\(ctxPrefix)48%")
             }
         }
 
@@ -607,8 +743,14 @@ struct ClaudeCodeView: View {
             if showProgressBar {
                 let filledBlocks = max(0, min(10, (percentage + 5) / 10))
                 let emptyBlocks = 10 - filledBlocks
-                let bar = String(repeating: "▓", count: filledBlocks) + String(repeating: "░", count: emptyBlocks)
-                usageText += " \(bar)"
+                var barChars = Array(String(repeating: "▓", count: filledBlocks) + String(repeating: "░", count: emptyBlocks))
+
+                if showPaceMarker {
+                    let markerPos = max(0, min(9, previewMarkerPosition))
+                    barChars[markerPos] = "┃"
+                }
+
+                usageText += " \(String(barChars))"
             }
 
             if showResetTime {

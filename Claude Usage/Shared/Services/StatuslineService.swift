@@ -126,12 +126,14 @@ if [ -f "$config_file" ]; then
   show_pace_marker=$SHOW_PACE_MARKER
   show_reset=$SHOW_RESET_TIME
   use_24h=$USE_24_HOUR_TIME
+  show_context_label=$SHOW_CONTEXT_LABEL
   show_usage_label=$SHOW_USAGE_LABEL
   show_reset_label=$SHOW_RESET_LABEL
   color_mode=$COLOR_MODE
   single_color=$SINGLE_COLOR
   show_profile=$SHOW_PROFILE
   profile_name="$PROFILE_NAME"
+  pace_marker_step_colors=$PACE_MARKER_STEP_COLORS
 else
   show_model=1
   show_dir=1
@@ -143,12 +145,14 @@ else
   show_pace_marker=1
   show_reset=1
   use_24h=0
+  show_context_label=1
   show_usage_label=1
   show_reset_label=1
   color_mode="colored"
   single_color="#00BFFF"
   show_profile=0
   profile_name=""
+  pace_marker_step_colors=1
 fi
 
 input=$(cat)
@@ -250,6 +254,16 @@ else
   PACE_RUNAWAY=$'\\033[38;5;135m'     # purple
 fi
 
+# When pace step colors enabled, always use real 6-tier colors regardless of color mode
+if [ "$pace_marker_step_colors" != "0" ]; then
+  PACE_COMFORTABLE=$'\\033[38;5;34m'
+  PACE_ON_TRACK=$'\\033[38;5;37m'
+  PACE_WARMING=$'\\033[38;5;178m'
+  PACE_PRESSING=$'\\033[38;5;208m'
+  PACE_CRITICAL=$'\\033[38;5;160m'
+  PACE_RUNAWAY=$'\\033[38;5;135m'
+fi
+
 # Build components (without separators)
 dir_text=""
 if [ "$show_dir" = "1" ]; then
@@ -303,15 +317,18 @@ if [ "$show_context" = "1" ]; then
     context_int=$context_pct
 
     # Display as tokens or percentage
+    ctx_label=""
+    [ "$show_context_label" = "1" ] && ctx_label="Ctx: "
+
     if [ "$context_as_tokens" = "1" ]; then
       if [ "$current_tokens" -ge 1000 ]; then
         tokens_k=$((current_tokens / 1000))
-        context_text="${context_color}Ctx: ${tokens_k}K${RESET}"
+        context_text="${context_color}${ctx_label}${tokens_k}K${RESET}"
       else
-        context_text="${context_color}Ctx: ${current_tokens}${RESET}"
+        context_text="${context_color}${ctx_label}${current_tokens}${RESET}"
       fi
     else
-      context_text="${context_color}Ctx: ${context_int}%${RESET}"
+      context_text="${context_color}${ctx_label}${context_int}%${RESET}"
     fi
   fi
 fi
@@ -409,13 +426,13 @@ if [ "$show_usage" = "1" ]; then
         remaining=$((reset_epoch - now_epoch))
         if [ $remaining -gt 0 ] && [ $remaining -lt 18000 ]; then
           elapsed_secs=$((18000 - remaining))
-          marker_pos=$((elapsed_secs * 10 / 18000))
+          marker_pos=$(( (elapsed_secs * 10 + 9000) / 18000 ))
           [ $marker_pos -gt 9 ] && marker_pos=9
           [ $marker_pos -lt 0 ] && marker_pos=0
 
-          # Compute 6-tier pace color (integer math, >= 15% elapsed = 2700s)
+          # Compute 6-tier pace color (integer math, >= 3% elapsed = 540s)
           pace_color=""
-          if [ $elapsed_secs -ge 2700 ]; then
+          if [ $elapsed_secs -ge 540 ]; then
             projected_pct=$((utilization * 18000 / elapsed_secs))
             if [ $projected_pct -lt 50 ]; then
               pace_color="$PACE_COMFORTABLE"
@@ -432,12 +449,17 @@ if [ "$show_usage" = "1" ]; then
             fi
           fi
 
+          # Override: use usage bar color if step colors disabled
+          if [ "$pace_marker_step_colors" = "0" ]; then
+            pace_color="$usage_color"
+          fi
+
           if [ -n "$pace_color" ]; then
-            # Replace bar character at marker_pos with colored │
+            # Replace bar character at marker_pos with bold ┃
             # progress_bar = " " + 10 block chars; marker_pos+1 is the target index
             left="${progress_bar:0:$((marker_pos + 1))}"
             right="${progress_bar:$((marker_pos + 2))}"
-            progress_bar="${left}${pace_color}│${RESET}${right}"
+            progress_bar="${left}${pace_color}┃${RESET}${usage_color}${right}"
           fi
         fi
       fi
@@ -612,8 +634,10 @@ printf "%s\\n" "$output"
         showUsage: Bool,
         showProgressBar: Bool,
         showPaceMarker: Bool = true,
+        paceMarkerStepColors: Bool = true,
         showResetTime: Bool,
         use24HourTime: Bool = false,
+        showContextLabel: Bool = true,
         showUsageLabel: Bool = true,
         showResetLabel: Bool = true,
         colorMode: StatuslineColorMode = .colored,
@@ -643,8 +667,10 @@ CONTEXT_AS_TOKENS=\(contextAsTokens ? "1" : "0")
 SHOW_USAGE=\(showUsage ? "1" : "0")
 SHOW_PROGRESS_BAR=\(showProgressBar ? "1" : "0")
 SHOW_PACE_MARKER=\(showPaceMarker ? "1" : "0")
+PACE_MARKER_STEP_COLORS=\(paceMarkerStepColors ? "1" : "0")
 SHOW_RESET_TIME=\(showResetTime ? "1" : "0")
 USE_24_HOUR_TIME=\(use24HourTime ? "1" : "0")
+SHOW_CONTEXT_LABEL=\(showContextLabel ? "1" : "0")
 SHOW_USAGE_LABEL=\(showUsageLabel ? "1" : "0")
 SHOW_RESET_LABEL=\(showResetLabel ? "1" : "0")
 COLOR_MODE=\(colorModeString)

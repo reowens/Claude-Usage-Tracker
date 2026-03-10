@@ -71,7 +71,7 @@ enum MenuBarColorMode: String, Codable, CaseIterable {
         case .multiColor:
             return "Multi-Color"
         case .monochrome:
-            return "Monochrome"
+            return "Greyscale"
         case .singleColor:
             return "Single Color"
         }

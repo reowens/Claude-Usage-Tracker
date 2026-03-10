@@ -25,7 +25,7 @@ enum StatuslineColorMode: String, Codable, CaseIterable {
         case .colored:
             return "Multi-Color"
         case .monochrome:
-            return "Monochrome"
+            return "Greyscale"
         case .singleColor:
             return "Single Color"
         }
@@ -72,7 +72,7 @@ enum WidgetColorMode: String, Codable, CaseIterable {
         case .multiColor:
             return "Multi-Color"
         case .monochrome:
-            return "Monochrome"
+            return "Greyscale"
         case .singleColor:
             return "Single Color"
         }
@@ -133,7 +133,7 @@ enum SmallWidgetMetric: String, Codable, CaseIterable {
         case .weekly:
             return "calendar"
         case .opus:
-            return "star.fill"
+            return "brain"
         case .sonnet:
             return "bolt.fill"
         case .extra:

@@ -452,8 +452,8 @@
 "appearance.pace_marker_section_subtitle" = "Track usage pace relative to reset periods";
 "appearance.show_time_marker_title" = "Show Time Marker";
 "appearance.show_time_marker_description" = "Display a tick mark on progress bars showing how far through the time period you are";
-"appearance.show_pace_marker_title" = "Color Marker by Pace";
-"appearance.show_pace_marker_description" = "Color the time marker based on projected usage pace (green → purple). Applies to session and weekly metrics.";
+"appearance.show_pace_marker_title" = "Pace tier colors";
+"appearance.show_pace_marker_description" = "6-tier projected pace (green → purple)";
 "appearance.pace_coloring_title" = "Pace-Aware Bar Colors";
 "appearance.pace_coloring_description" = "Color progress bars based on projected pace instead of current usage level. Projects whether you'll hit limits by the end of the period.";
 "appearance.multiprofile_locked_title" = "Appearance Settings Locked";

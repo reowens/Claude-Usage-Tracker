@@ -201,7 +201,7 @@ struct WidgetSettingsView: View {
 
                 if showPaceMarker {
                     SettingToggle(
-                        title: "Use 6-color scale",
+                        title: "Pace tier colors",
                         description: "6-tier projected pace (green → purple)",
                         isOn: Binding(
                             get: { paceMarkerStepColors },

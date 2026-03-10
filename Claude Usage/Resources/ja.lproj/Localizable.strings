@@ -70,6 +70,8 @@
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";
 "menubar.resets_time" = "%@にリセット";
+"menubar.resets_in" = "%@後にリセット";
+"menubar.resets_both" = "%@でリセット (%@)";
 "menubar.click_status" = "クリックしてstatus.claude.comを開く";
 
 /* ==================== */
@@ -717,6 +719,10 @@
 "personal.success_key_saved" = "セッションキーが正常に保存されました";
 "personal.remove_title" = "認証情報を削除";
 "personal.remove_subtitle" = "このプロファイルからClaude.aiセッションキーを完全に削除";
+"personal.signin_description" = "サインインしてセッションキーを自動的に取得します。";
+"personal.signin_button" = "Claude.aiにサインイン";
+"personal.signin_sheet_title" = "Claude.aiにサインイン";
+"personal.advanced_manual_key" = "詳細：手動セッションキー入力";
 "about.run_setup_wizard" = "セットアップウィザードを実行";
 
 /* Migration & Reset */
@@ -868,6 +874,27 @@
 "mobile.privacy_note" = "個人データは収集されません。興味の登録のみです。";
 "mobile.error_title" = "リクエスト失敗";
 "mobile.error_message" = "興味を登録できませんでした。インターネット接続を確認して再度お試しください。";
+
+/* ==================== */
+/* MARK: - Popover Settings */
+/* ==================== */
+"section.popover_title" = "ポップオーバー";
+"section.popover_desc" = "ポップオーバーの表示をカスタマイズ";
+"section.app_settings_title" = "設定";
+"section.app_settings_desc" = "アプリの設定と起動";
+"popover.title" = "ポップオーバー";
+"popover.subtitle" = "ポップオーバーでの使用状況の表示方法をカスタマイズ";
+"popover.display_section" = "表示";
+"popover.time_display" = "時間表示";
+"popover.time_display_desc" = "リセット時間の表示方法を選択";
+"popover.time_display_reset" = "リセット時刻";
+"popover.time_display_remaining" = "残り時間";
+"popover.time_display_both" = "両方";
+"popover.time_format" = "時刻形式";
+"popover.time_format_desc" = "アプリ全体での時刻の表示形式を選択";
+"popover.time_format_system" = "システム";
+"popover.time_format_12h" = "12時間";
+"popover.time_format_24h" = "24時間";
 
 /* ==================== */
 /* MARK: - Feedback Prompt */

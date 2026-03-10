@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // MARK: - Always-active vibrancy background
 struct VisualEffectBackground: NSViewRepresentable {
@@ -57,7 +58,6 @@ struct PopoverContentView: View {
     @ObservedObject var manager: MenuBarManager
     let onRefresh: () -> Void
     let onPreferences: () -> Void
-    let onQuit: () -> Void
 
     @State private var isRefreshing = false
     @State private var showInsights = false
@@ -79,7 +79,12 @@ struct PopoverContentView: View {
     }
 
     private var displayAPIUsage: APIUsage? {
-        manager.clickedProfileAPIUsage ?? manager.apiUsage
+        // When viewing a non-active profile, use only that profile's API data
+        // to avoid leaking the active profile's console data
+        if manager.clickedProfileUsage != nil {
+            return manager.clickedProfileAPIUsage
+        }
+        return manager.apiUsage
     }
 
     var body: some View {
@@ -101,6 +106,7 @@ struct PopoverContentView: View {
                     }
                 },
                 onManageProfiles: onPreferences,
+                onPreferences: onPreferences,
                 clickedProfileId: manager.clickedProfileId
             )
 
@@ -191,18 +197,10 @@ struct PopoverContentView: View {
                     .transition(.opacity)
             }
 
-            PopoverDivider()
-
-            // Footer
-            SmartFooter(
-                usage: displayUsage,
-                status: manager.status,
-                showInsights: $showInsights,
-                onPreferences: onPreferences,
-                onQuit: onQuit
-            )
         }
+        .padding(.bottom, 8)
         .frame(width: 280)
+        .fixedSize(horizontal: false, vertical: true)
         .background(VisualEffectBackground())
     }
 }
@@ -244,7 +242,7 @@ struct ProfileSwitcherCompact: View {
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.adaptiveGreen)
                             }
 
                             if profile.claudeSessionKey != nil {
@@ -312,7 +310,7 @@ struct ProfileSwitcherBar: View {
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.adaptiveGreen)
                             }
 
                             if profile.claudeSessionKey != nil {
@@ -421,13 +419,14 @@ struct SmartHeader: View {
     let isRefreshing: Bool
     let onRefresh: () -> Void
     let onManageProfiles: () -> Void
+    let onPreferences: () -> Void
     var clickedProfileId: UUID? = nil
 
     @StateObject private var profileManager = ProfileManager.shared
 
     private var statusColor: Color {
         switch status.indicator.color {
-        case .green: return .green
+        case .green: return .adaptiveGreen
         case .yellow: return .yellow
         case .orange: return .orange
         case .red: return .red
@@ -456,60 +455,89 @@ struct SmartHeader: View {
 
     var body: some View {
         HStack {
-            HStack(spacing: 2) {
-                Image("HeaderLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 34, height: 34)
-                    .foregroundColor(.primary.opacity(0.3))
+            VStack(alignment: .leading, spacing: 2) {
+                ProfileSwitcherCompact(onManageProfiles: onManageProfiles)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    ProfileSwitcherCompact(onManageProfiles: onManageProfiles)
-
-                    // Status
-                    Button(action: {
-                        if let url = URL(string: "https://status.claude.com") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(statusColor)
-                                .frame(width: 6, height: 6)
-
-                            Text(status.description)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
+                // Status
+                Button(action: {
+                    if let url = URL(string: "https://status.claude.com") {
+                        NSWorkspace.shared.open(url)
                     }
-                    .buttonStyle(.plain)
-                    .help("Click to open status.claude.com")
+                }) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+
+                        Text(status.description)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .buttonStyle(.plain)
+                .help("Click to open status.claude.com")
             }
 
             Spacer()
 
-            // Refresh
-            Button(action: onRefresh) {
-                ZStack {
-                    if isRefreshing {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 14, height: 14)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                }
-                .foregroundColor(.secondary)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
+            HStack(alignment: .center, spacing: 2) {
+                // Refresh
+                HeaderIconButton(
+                    icon: "arrow.clockwise",
+                    isRefreshing: isRefreshing,
+                    action: onRefresh
+                )
+                .disabled(isRefreshing)
+
+                // Settings
+                HeaderIconButton(
+                    icon: "gearshape.fill",
+                    fontSize: 12,
+                    action: onPreferences
+                )
             }
-            .buttonStyle(.plain)
-            .disabled(isRefreshing)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+}
+
+// MARK: - Header Icon Button
+struct HeaderIconButton: View {
+    let icon: String
+    var fontSize: CGFloat = 10.5
+    var isRefreshing: Bool = false
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 10, height: 10)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: fontSize, weight: .medium))
+                        .imageScale(.medium)
+                }
+            }
+            .foregroundColor(isHovered ? .primary : .secondary)
+            .frame(width: 24, height: 24, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
     }
 }
 
@@ -546,9 +574,12 @@ struct SmartUsageDashboard: View {
         return profileManager.activeProfile?.iconConfig.usePaceColoring ?? true
     }
 
-
     private var isAPITrackingEnabled: Bool {
         DataStore.shared.loadAPITrackingEnabled()
+    }
+
+    private var timeDisplay: PopoverTimeDisplay {
+        SharedDataStore.shared.loadPopoverTimeDisplay()
     }
 
     var body: some View {
@@ -557,14 +588,15 @@ struct SmartUsageDashboard: View {
             UsageRow(
                 title: "menubar.session_usage".localized,
                 subtitle: "menubar.5_hour_window".localized,
-                usedPercentage: usage.sessionPercentage,
+                usedPercentage: usage.effectiveSessionPercentage,
                 showRemaining: showRemainingPercentage,
                 resetTime: usage.sessionResetTime,
                 periodDuration: Constants.sessionWindow,
                 showTimeMarker: showTimeMarker,
                 usePaceColoring: usePaceColoring,
                 colorMode: colorMode,
-                singleColorHex: singleColorHex
+                singleColorHex: singleColorHex,
+                timeDisplay: timeDisplay
             )
 
             // All Models (Weekly)
@@ -579,7 +611,8 @@ struct SmartUsageDashboard: View {
                 showTimeMarker: showTimeMarker,
                 usePaceColoring: usePaceColoring,
                 colorMode: colorMode,
-                singleColorHex: singleColorHex
+                singleColorHex: singleColorHex,
+                timeDisplay: timeDisplay
             )
 
             if usage.opusWeeklyTokensUsed > 0 {
@@ -605,7 +638,8 @@ struct SmartUsageDashboard: View {
                     resetTime: usage.sonnetWeeklyResetTime,
                     periodDuration: nil,
                     colorMode: colorMode,
-                    singleColorHex: singleColorHex
+                    singleColorHex: singleColorHex,
+                    timeDisplay: timeDisplay
                 )
             }
 
@@ -632,7 +666,7 @@ struct SmartUsageDashboard: View {
                         Spacer()
                         Text(String(format: "%.2f %@", balance / 100.0, balanceCurrency.uppercased()))
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.green)
+                            .foregroundColor(.adaptiveGreen)
                     }
                 }
             }
@@ -646,8 +680,14 @@ struct SmartUsageDashboard: View {
                     apiUsage: apiUsage,
                     showRemaining: showRemainingPercentage,
                     colorMode: colorMode,
-                    singleColorHex: singleColorHex
+                    singleColorHex: singleColorHex,
+                    timeDisplay: timeDisplay
                 )
+
+                // API Cost Card (only if cost data is available)
+                if let costCents = apiUsage.apiTokenCostCents, costCents > 0 {
+                    APICostCard(apiUsage: apiUsage)
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -668,6 +708,7 @@ struct UsageRow: View {
     var usePaceColoring: Bool = true
     var colorMode: MenuBarColorMode = .multiColor
     var singleColorHex: String = "#00BFFF"
+    var timeDisplay: PopoverTimeDisplay = .resetTime
 
     private var displayPercentage: Double {
         UsageStatusCalculator.getDisplayPercentage(
@@ -701,7 +742,7 @@ struct UsageRow: View {
         switch colorMode {
         case .multiColor:
             switch statusLevel {
-            case .safe: return .green
+            case .safe: return .adaptiveGreen
             case .moderate: return .orange
             case .critical: return .red
             }
@@ -773,7 +814,7 @@ struct UsageRow: View {
 
             // Reset time
             if let reset = resetTime {
-                Text("menubar.resets_time".localized(with: reset.resetTimeString()))
+                Text(resetTimeText(for: reset))
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
             }
@@ -785,6 +826,17 @@ struct UsageRow: View {
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
     }
+
+    private func resetTimeText(for reset: Date) -> String {
+        switch timeDisplay {
+        case .resetTime:
+            return "menubar.resets_time".localized(with: reset.resetTimeString())
+        case .remainingTime:
+            return "menubar.resets_in".localized(with: reset.timeRemainingString())
+        case .both:
+            return "menubar.resets_both".localized(with: reset.timeRemainingString(), reset.resetTimeString())
+        }
+    }
 }
 
 // MARK: - Contextual Insights
@@ -794,7 +846,7 @@ struct ContextualInsights: View {
     private var insights: [Insight] {
         var result: [Insight] = []
 
-        if usage.sessionPercentage > 80 {
+        if usage.effectiveSessionPercentage > 80 {
             result.append(Insight(
                 icon: "exclamationmark.triangle.fill",
                 color: .orange,
@@ -812,10 +864,10 @@ struct ContextualInsights: View {
             ))
         }
 
-        if usage.sessionPercentage < 20 && usage.weeklyPercentage < 30 {
+        if usage.effectiveSessionPercentage < 20 && usage.weeklyPercentage < 30 {
             result.append(Insight(
                 icon: "checkmark.circle.fill",
-                color: .green,
+                color: .adaptiveGreen,
                 title: "usage.efficient".localized,
                 description: "usage.efficient.desc".localized
             ))
@@ -867,24 +919,16 @@ struct SmartFooter: View {
     let status: ClaudeStatus
     @Binding var showInsights: Bool
     let onPreferences: () -> Void
-    let onQuit: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack {
+            Spacer()
             SmartActionButton(
                 icon: "gearshape.fill",
                 title: "common.settings".localized,
                 action: onPreferences
             )
-            .frame(maxWidth: .infinity)
-
-            SmartActionButton(
-                icon: "power",
-                title: "common.quit".localized,
-                isDestructive: true,
-                action: onQuit
-            )
-            .frame(maxWidth: .infinity)
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -898,7 +942,7 @@ struct ClaudeStatusRow: View {
 
     private var statusColor: Color {
         switch status.indicator.color {
-        case .green: return .green
+        case .green: return .adaptiveGreen
         case .yellow: return .yellow
         case .orange: return .orange
         case .red: return .red
@@ -977,12 +1021,234 @@ struct SmartActionButton: View {
     }
 }
 
+// MARK: - API Cost Card
+struct APICostCard: View {
+    let apiUsage: APIUsage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            // Header
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("API Cost")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.primary)
+
+                    Text("This Month")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // Total cost
+                if let formatted = apiUsage.formattedAPICost {
+                    Text(formatted)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                }
+            }
+
+            // Daily cost chart
+            DailyCostChart(dailyCosts: apiUsage.sortedDailyCosts, currency: apiUsage.currency)
+
+            // Per-key breakdown (if multiple sources) or flat model list
+            if apiUsage.hasMultipleSources {
+                VStack(spacing: 6) {
+                    ForEach(apiUsage.sortedCostSources) { source in
+                        APICostSourceRow(source: source, currency: apiUsage.currency)
+                    }
+                }
+            } else {
+                // Single source or no source data — show flat model breakdown
+                let models = apiUsage.sortedModelCosts
+                if !models.isEmpty {
+                    VStack(spacing: 4) {
+                        ForEach(models, id: \.model) { item in
+                            HStack {
+                                Text(item.model)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+
+                                Spacer()
+
+                                Text(item.cost)
+                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Daily Cost Chart
+struct DailyCostChart: View {
+    let dailyCosts: [(date: Date, cents: Double)]
+    let currency: String
+
+    private struct DayCost: Identifiable {
+        let id: Date
+        let dollars: Double
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
+    private var xDomain: ClosedRange<Date> {
+        let cal = Calendar.current
+        let today = Date()
+        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: today))!
+        // End of today (start of tomorrow)
+        let endOfToday = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: today))!
+        return startOfMonth ... endOfToday
+    }
+
+    var body: some View {
+        if !dailyCosts.isEmpty {
+            let data = dailyCosts.map { DayCost(id: $0.date, dollars: $0.cents / 100.0) }
+            let maxValue = data.map(\.dollars).max() ?? 0
+            Chart(data) { item in
+                BarMark(
+                    x: .value("Day", item.id, unit: .day),
+                    y: .value("Cost", item.dollars),
+                    width: .fixed(12)
+                )
+                .foregroundStyle(Color.orange.opacity(0.75))
+                .cornerRadius(2)
+            }
+            .chartXScale(domain: xDomain)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day)) { value in
+                    AxisValueLabel(centered: true) {
+                        if let date = value.as(Date.self) {
+                            Text("\(Calendar.current.component(.day, from: date))")
+                                .font(.system(size: 7))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
+                        .foregroundStyle(Color.secondary.opacity(0.15))
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(formatDollars(v, max: maxValue))
+                                .font(.system(size: 7, design: .rounded))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
+                    }
+                }
+            }
+            .chartYScale(domain: 0 ... max(maxValue * 1.15, 0.01))
+            .frame(height: 80)
+        }
+    }
+
+    private func formatDollars(_ amount: Double, max: Double) -> String {
+        if max >= 100 {
+            return "$\(Int(amount))"
+        } else if max >= 1 {
+            return String(format: "$%.1f", amount)
+        } else {
+            return String(format: "$%.2f", amount)
+        }
+    }
+}
+
+// MARK: - API Cost Source Row
+struct APICostSourceRow: View {
+    let source: APICostSource
+    let currency: String
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(spacing: 4) {
+            // Source header (tappable to expand)
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: source.sourceType.icon)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+
+                    Text(source.keyName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(source.formattedTotal(currency: currency))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.primary)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.06))
+                )
+            }
+            .buttonStyle(.plain)
+
+            // Expanded model breakdown
+            if isExpanded {
+                let models = source.sortedModelCosts(currency: currency)
+                VStack(spacing: 3) {
+                    ForEach(models, id: \.model) { item in
+                        HStack {
+                            Text(item.model)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            Text(item.cost)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.leading, 24)
+                .padding(.trailing, 6)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
 // MARK: - API Usage Card
 struct APIUsageCard: View {
     let apiUsage: APIUsage
     let showRemaining: Bool
     var colorMode: MenuBarColorMode = .multiColor
     var singleColorHex: String = "#00BFFF"
+    var timeDisplay: PopoverTimeDisplay = .resetTime
 
     private var displayPercentage: Double {
         UsageStatusCalculator.getDisplayPercentage(
@@ -1002,7 +1268,7 @@ struct APIUsageCard: View {
         switch colorMode {
         case .multiColor:
             switch statusLevel {
-            case .safe: return .green
+            case .safe: return .adaptiveGreen
             case .moderate: return .orange
             case .critical: return .red
             }
@@ -1063,7 +1329,7 @@ struct APIUsageCard: View {
 
             // Reset Time
             if apiUsage.resetsAt > Date() {
-                Text("menubar.resets_time".localized(with: apiUsage.resetsAt.formatted(.relative(presentation: .named))))
+                Text(resetTimeText(for: apiUsage.resetsAt))
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
             }
@@ -1074,6 +1340,17 @@ struct APIUsageCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
+    }
+
+    private func resetTimeText(for reset: Date) -> String {
+        switch timeDisplay {
+        case .resetTime:
+            return "menubar.resets_time".localized(with: reset.resetTimeString())
+        case .remainingTime:
+            return "menubar.resets_in".localized(with: reset.timeRemainingString())
+        case .both:
+            return "menubar.resets_both".localized(with: reset.timeRemainingString(), reset.resetTimeString())
+        }
     }
 }
 

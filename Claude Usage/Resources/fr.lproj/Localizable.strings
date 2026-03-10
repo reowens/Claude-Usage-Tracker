@@ -70,6 +70,8 @@
 "menubar.used" = "Utilisé";
 "menubar.remaining" = "Restant";
 "menubar.resets_time" = "Réinitialise %@";
+"menubar.resets_in" = "Réinitialisation dans %@";
+"menubar.resets_both" = "Réinitialisation dans %@ (%@)";
 "menubar.click_status" = "Cliquer pour ouvrir status.claude.com";
 
 /* ==================== */
@@ -695,6 +697,10 @@
 "personal.success_key_saved" = "Clé de session enregistrée avec succès";
 "personal.remove_title" = "Supprimer les Identifiants";
 "personal.remove_subtitle" = "Supprimer définitivement votre clé de session Claude.ai de ce profil";
+"personal.signin_description" = "Connectez-vous pour extraire automatiquement votre clé de session.";
+"personal.signin_button" = "Se connecter à Claude.ai";
+"personal.signin_sheet_title" = "Se connecter à Claude.ai";
+"personal.advanced_manual_key" = "Avancé : Clé de session manuelle";
 "about.run_setup_wizard" = "Exécuter l'Assistant de Configuration";
 
 /* Migration & Reset */
@@ -846,6 +852,27 @@
 "mobile.privacy_note" = "Aucune donnée personnelle n'est collectée. Cela enregistre uniquement votre intérêt.";
 "mobile.error_title" = "Échec de la requête";
 "mobile.error_message" = "Impossible d'enregistrer votre intérêt. Vérifiez votre connexion internet et réessayez.";
+
+/* ==================== */
+/* MARK: - Popover Settings */
+/* ==================== */
+"section.popover_title" = "Popover";
+"section.popover_desc" = "Personnaliser l'affichage du popover";
+"section.app_settings_title" = "Réglages";
+"section.app_settings_desc" = "Réglages de l'application et démarrage";
+"popover.title" = "Popover";
+"popover.subtitle" = "Personnalisez l'affichage des informations d'utilisation dans le popover";
+"popover.display_section" = "Affichage";
+"popover.time_display" = "Affichage du temps";
+"popover.time_display_desc" = "Choisir ce qui s'affiche pour les temps de réinitialisation";
+"popover.time_display_reset" = "Heure";
+"popover.time_display_remaining" = "Restant";
+"popover.time_display_both" = "Les deux";
+"popover.time_format" = "Format de l'heure";
+"popover.time_format_desc" = "Choisissez comment les heures sont affichées dans l'application";
+"popover.time_format_system" = "Système";
+"popover.time_format_12h" = "12 heures";
+"popover.time_format_24h" = "24 heures";
 
 /* ==================== */
 /* MARK: - Feedback Prompt */

@@ -40,6 +40,10 @@ extension Date {
         let days = hours / 24
 
         if days > 0 {
+            let remainingHours = hours % 24
+            if remainingHours > 0 {
+                return "\(days)d \(remainingHours)h"
+            }
             return days == 1 ? "1 day" : "\(days) days"
         } else if hours > 0 {
             if minutes > 0 {
@@ -61,14 +65,15 @@ extension Date {
         let calendar = Calendar.current
         let formatter = DateFormatter()
         formatter.timeZone = timezone
+        let use24h = SharedDataStore.shared.uses24HourTime()
+        let timeFmt = use24h ? "HH:mm" : "h:mma"
 
-        if calendar.isDateInToday(roundedDate) {
-            formatter.dateFormat = "'Today,' h:mma"
-        } else if calendar.isDateInTomorrow(roundedDate) {
-            formatter.dateFormat = "'Tomorrow,' h:mma"
+        if calendar.isDateInToday(self) {
+            formatter.dateFormat = "'Today' \(timeFmt)"
+        } else if calendar.isDateInTomorrow(self) {
+            formatter.dateFormat = "'Tomorrow' \(timeFmt)"
         } else {
-            // Show day name (e.g., "Wednesday, 7:00PM")
-            formatter.dateFormat = "EEEE',' h:mma"
+            formatter.dateFormat = "MMM d, \(timeFmt)"
         }
 
         // Convert am/pm to uppercase AM/PM

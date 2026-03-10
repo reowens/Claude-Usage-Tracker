@@ -282,6 +282,8 @@ struct SettingsView: View {
                     ClaudeCodeView()
 
                 // Shared Settings
+                case .appSettings:
+                    AppSettingsView()
                 case .manageProfiles:
                     ManageProfilesView()
                 case .language:
@@ -294,6 +296,8 @@ struct SettingsView: View {
                     SupportView()
                 case .mobileApp:
                     MobileAppView()
+                case .popover:
+                    PopoverSettingsView()
                 case .debug:
                     DebugNetworkLogView()
                 case .about:
@@ -444,7 +448,7 @@ struct AppSettingsSection: View {
 
 struct BottomBarSection: View {
     @Binding var selectedSection: SettingsSection
-    @State private var hoveredItem: SettingsSection?
+    @State private var hoveredItem: String?
 
     var items: [SettingsSection] {
         SettingsSection.allCases.filter { $0.isBottomBarItem }
@@ -456,28 +460,63 @@ struct BottomBarSection: View {
 
             HStack(spacing: 0) {
                 ForEach(items, id: \.self) { section in
-                Button {
-                    selectedSection = section
-                } label: {
-                    Image(systemName: section.icon)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(selectedSection == section ? .white : .secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(selectedSection == section ? SettingsColors.primary : (hoveredItem == section ? Color.primary.opacity(0.06) : Color.clear))
+                    Button {
+                        selectedSection = section
+                    } label: {
+                        bottomBarLabel(
+                            icon: section.icon,
+                            label: section.shortLabel,
+                            isSelected: selectedSection == section,
+                            isHovered: hoveredItem == section.rawValue
                         )
-                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        hoveredItem = hovering ? section.rawValue : nil
+                    }
+                    .help(section.title)
+                }
+
+                // Quit button
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    bottomBarLabel(
+                        icon: "power",
+                        label: "common.quit".localized,
+                        isSelected: false,
+                        isHovered: hoveredItem == "quit",
+                        hoverColor: Color.red.opacity(0.1)
+                    )
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    hoveredItem = hovering ? section : nil
+                    hoveredItem = hovering ? "quit" : nil
                 }
-                .help(section.title)
+                .help("common.quit".localized)
             }
         }
+    }
+
+    private func bottomBarLabel(icon: String, label: String, isSelected: Bool, isHovered: Bool, hoverColor: Color? = nil) -> some View {
+        VStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(isSelected ? .white : .secondary)
+                .frame(height: 14)
+
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(isSelected ? .white.opacity(0.9) : .secondary.opacity(0.7))
+                .lineLimit(1)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isSelected ? SettingsColors.primary : (isHovered ? (hoverColor ?? Color.primary.opacity(0.06)) : Color.clear))
+        )
+        .contentShape(Rectangle())
     }
 }
 
@@ -495,12 +534,14 @@ enum SettingsSection: String, CaseIterable {
     case claudeCode
 
     // Shared Settings
+    case appSettings
     case manageProfiles
     case language
     case shortcuts
     case updates
     case support
     case mobileApp
+    case popover
     case debug
     case about
 
@@ -513,6 +554,7 @@ enum SettingsSection: String, CaseIterable {
         case .menuBar: return "Menu Bar"
         case .widgets: return "Widgets"
         case .history: return "section.history_title".localized
+        case .appSettings: return "section.app_settings_title".localized
         case .manageProfiles: return "section.manage_profiles_title".localized
         case .language: return "language.title".localized
         case .claudeCode: return "settings.claude_cli".localized
@@ -520,6 +562,7 @@ enum SettingsSection: String, CaseIterable {
         case .updates: return "settings.updates".localized
         case .support: return "section.support_title".localized
         case .mobileApp: return "section.mobile_app_title".localized
+        case .popover: return "section.popover_title".localized
         case .debug: return "section.debug_title".localized
         case .about: return "settings.about".localized
         }
@@ -534,6 +577,7 @@ enum SettingsSection: String, CaseIterable {
         case .menuBar: return "menubar.rectangle"
         case .widgets: return "square.grid.2x2.fill"
         case .history: return "chart.bar.xaxis"
+        case .appSettings: return "gearshape.2.fill"
         case .manageProfiles: return "person.2.fill"
         case .language: return "globe"
         case .claudeCode: return "chevron.left.forwardslash.chevron.right"
@@ -541,6 +585,7 @@ enum SettingsSection: String, CaseIterable {
         case .updates: return "arrow.down.circle.fill"
         case .support: return "heart.fill"
         case .mobileApp: return "iphone"
+        case .popover: return "rectangle.topthird.inset.filled"
         case .debug: return "ladybug.fill"
         case .about: return "info.circle.fill"
         }
@@ -555,6 +600,7 @@ enum SettingsSection: String, CaseIterable {
         case .menuBar: return "Configure menu bar appearance and metrics"
         case .widgets: return "Customize desktop widget appearance"
         case .history: return "section.history_desc".localized
+        case .appSettings: return "section.app_settings_desc".localized
         case .manageProfiles: return "section.manage_profiles_desc".localized
         case .language: return "language.subtitle".localized
         case .claudeCode: return "settings.claude_cli.description".localized
@@ -562,8 +608,18 @@ enum SettingsSection: String, CaseIterable {
         case .updates: return "settings.updates.description".localized
         case .support: return "section.support_desc".localized
         case .mobileApp: return "section.mobile_app_desc".localized
+        case .popover: return "section.popover_desc".localized
         case .debug: return "section.debug_desc".localized
         case .about: return "settings.about.description".localized
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .about: return "About"
+        case .debug: return "Debug"
+        case .support: return "Support"
+        default: return title
         }
     }
 
@@ -587,7 +643,7 @@ enum SettingsSection: String, CaseIterable {
 
     var isBottomBarItem: Bool {
         switch self {
-        case .about, .debug, .support, .updates:
+        case .about, .debug, .support:
             return true
         default:
             return false

@@ -391,11 +391,15 @@ class MenuBarManager: NSObject, ObservableObject {
 
         // Recreate popover with fresh content
         let newPopover = NSPopover()
-        newPopover.contentSize = NSSize(width: 320, height: 600)
+        newPopover.contentSize = NSSize(width: 320, height: 10) // Auto-sized by SwiftUI content
         newPopover.behavior = .semitransient
         newPopover.animates = true
         newPopover.delegate = self
-        newPopover.contentViewController = createContentViewController()
+        let hostingController = createContentViewController()
+        if #available(macOS 13.0, *) {
+            hostingController.sizingOptions = .intrinsicContentSize
+        }
+        newPopover.contentViewController = hostingController
 
         self.popover = newPopover
 
@@ -455,12 +459,16 @@ class MenuBarManager: NSObject, ObservableObject {
 
     private func setupPopover() {
         let popover = NSPopover()
-        popover.contentSize = NSSize(width: 320, height: 600)
+        popover.contentSize = NSSize(width: 320, height: 10) // Initial size; auto-sized by SwiftUI content
         popover.behavior = .semitransient  // Changed to allow detaching
         popover.animates = true
         popover.delegate = self
 
-        popover.contentViewController = createContentViewController()
+        let hostingController = createContentViewController()
+        if #available(macOS 13.0, *) {
+            hostingController.sizingOptions = .intrinsicContentSize
+        }
+        popover.contentViewController = hostingController
         self.popover = popover
     }
 
@@ -474,9 +482,6 @@ class MenuBarManager: NSObject, ObservableObject {
             onPreferences: { [weak self] in
                 self?.closePopoverOrWindow()
                 self?.preferencesClicked()
-            },
-            onQuit: { [weak self] in
-                self?.quitClicked()
             }
         )
 
@@ -687,22 +692,11 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     private func observeAppearanceChanges() {
-        // Observe appearance changes on NSApp (fires less frequently than button)
-        // This optimization reduces redundant redraws
-        appearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, change in
-            guard let self = self,
-                  let button = self.statusItem?.button else { return }
-
-            // Cache the dark mode state to avoid querying it during layout
-            let isDark = change.newValue?.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-
-            DispatchQueue.main.async {
-                self.cachedIsDarkMode = isDark
-                // Clear cache to force redraw with new appearance
-                self.cachedImageKey = ""
-                self.updateStatusButton(button, usage: self.usage)
-            }
-        }
+        // Appearance observation is handled by StatusBarUIManager which observes
+        // each button's effectiveAppearance (important for per-display wallpaper)
+        // and NSApp.effectiveAppearance as fallback. Changes are routed through
+        // the StatusBarUIManagerDelegate.statusBarAppearanceDidChange() callback.
+        // No additional observer needed here to avoid duplicate redraws.
     }
 
     private func observeIconStyleChanges() {
@@ -1199,7 +1193,7 @@ class MenuBarManager: NSObject, ObservableObject {
                 LoggingService.shared.log("MenuBarManager: Failed to fetch status - [\(appError.code.rawValue)] \(appError.message)")
             }
 
-            // Fetch API usage if enabled (using active profile's API credentials)
+            // Fetch API usage (using active profile's API credentials)
             if let profile = await MainActor.run(body: { self.profileManager.activeProfile }),
                let apiSessionKey = profile.apiSessionKey,
                let orgId = profile.apiOrganizationId {
@@ -1262,13 +1256,13 @@ class MenuBarManager: NSObject, ObservableObject {
         let profileId = currentProfile.id
 
         // If usage dropped below 100%, clear the flag (session reset)
-        if usage.sessionPercentage < 100.0 {
+        if usage.effectiveSessionPercentage < 100.0 {
             autoSwitchedProfileIds.remove(profileId)
             return
         }
 
         // Guard: usage must be >= 100%
-        guard usage.sessionPercentage >= 100.0 else { return }
+        guard usage.effectiveSessionPercentage >= 100.0 else { return }
 
         // Guard: don't re-trigger for this profile
         guard !autoSwitchedProfileIds.contains(profileId) else { return }
@@ -1317,7 +1311,7 @@ class MenuBarManager: NSObject, ObservableObject {
             guard let candidateUsage = candidate.claudeUsage else { return candidate }
 
             // Must be below 100%
-            if candidateUsage.sessionPercentage < 100.0 {
+            if candidateUsage.effectiveSessionPercentage < 100.0 {
                 return candidate
             }
         }
@@ -1699,12 +1693,15 @@ extension MenuBarManager: NSPopoverDelegate {
 // MARK: - StatusBarUIManagerDelegate
 extension MenuBarManager: StatusBarUIManagerDelegate {
     func statusBarAppearanceDidChange() {
-        // Update cached dark mode state from app appearance (best effort for cache invalidation)
-        cachedIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        // Clear image cache to force redraw with new appearance
-        cachedImageKey = ""
-        // Update all icons with new appearance (each button reads its own effectiveAppearance)
-        updateAllStatusBarIcons()
+        // Debounce appearance changes — multiple displays and wallpaper-based appearance
+        // can fire many rapid changes. Coalesce into a single redraw after 0.15s of quiet.
+        updateDebounceTimer?.invalidate()
+        updateDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            self.cachedIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            self.cachedImageKey = ""
+            self.updateAllStatusBarIcons()
+        }
     }
 }
 

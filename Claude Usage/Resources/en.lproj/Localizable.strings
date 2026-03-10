@@ -63,6 +63,12 @@
 "menubar.sonnet_usage" = "Sonnet";
 "menubar.extra_usage" = "Extra Usage";
 "menubar.api_credits" = "API Credits";
+"menubar.api_cost" = "API Cost";
+"menubar.this_month" = "This Month";
+"menubar.total" = "Total";
+"menubar.cost_source.cli" = "Claude Code";
+"menubar.cost_source.api" = "API";
+"menubar.cost_source.unknown" = "Other";
 "menubar.5_hour_window" = "5-hour rolling window";
 "menubar.all_models" = "All models";
 "menubar.weekly" = "Weekly";
@@ -70,6 +76,8 @@
 "menubar.used" = "Used";
 "menubar.remaining" = "Remaining";
 "menubar.resets_time" = "Resets %@";
+"menubar.resets_in" = "Resets in %@";
+"menubar.resets_both" = "Resets in %@ (%@)";
 "menubar.click_status" = "Click to open status.claude.com";
 
 /* ==================== */
@@ -708,6 +716,10 @@
 "personal.success_key_saved" = "Session key saved successfully";
 "personal.remove_title" = "Remove Credentials";
 "personal.remove_subtitle" = "Permanently delete your Claude.ai session key from this profile";
+"personal.signin_description" = "Sign in to extract your session key automatically.";
+"personal.signin_button" = "Sign in to Claude.ai";
+"personal.signin_sheet_title" = "Sign in to Claude.ai";
+"personal.advanced_manual_key" = "Advanced: Manual Session Key";
 "about.run_setup_wizard" = "Run Setup Wizard";
 
 /* ==================== */
@@ -875,6 +887,27 @@
 "mobile.privacy_note" = "No personal data is collected. This only registers your interest.";
 "mobile.error_title" = "Request Failed";
 "mobile.error_message" = "Could not register your interest. Please check your internet connection and try again.";
+
+/* ==================== */
+/* MARK: - Popover Settings */
+/* ==================== */
+"section.popover_title" = "Popover";
+"section.popover_desc" = "Customize popover display";
+"section.app_settings_title" = "Settings";
+"section.app_settings_desc" = "App settings and startup";
+"popover.title" = "Popover";
+"popover.subtitle" = "Customize how the popover displays usage information";
+"popover.display_section" = "Display";
+"popover.time_display" = "Reset time display";
+"popover.time_display_desc" = "Choose what to show for reset times in the popover";
+"popover.time_display_reset" = "Reset time";
+"popover.time_display_remaining" = "Remaining";
+"popover.time_display_both" = "Both";
+"popover.time_format" = "Time format";
+"popover.time_format_desc" = "Choose how times are displayed throughout the app";
+"popover.time_format_system" = "System";
+"popover.time_format_12h" = "12-hour";
+"popover.time_format_24h" = "24-hour";
 
 /* ==================== */
 /* MARK: - Feedback Prompt */

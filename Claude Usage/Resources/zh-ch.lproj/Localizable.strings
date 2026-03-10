@@ -70,6 +70,8 @@
 "menubar.used" = "已使用";
 "menubar.remaining" = "剩余";
 "menubar.resets_time" = "重置时间 %@";
+"menubar.resets_in" = "%@后重置";
+"menubar.resets_both" = "%@后重置 (%@)";
 "menubar.click_status" = "点击打开 status.claude.com";
 
 /* ==================== */
@@ -707,6 +709,10 @@
 "personal.success_key_saved" = "会话密钥保存成功";
 "personal.remove_title" = "移除凭据";
 "personal.remove_subtitle" = "从此配置文件中永久删除您的 Claude.ai 会话密钥";
+"personal.signin_description" = "登录以自动提取您的会话密钥。";
+"personal.signin_button" = "登录 Claude.ai";
+"personal.signin_sheet_title" = "登录 Claude.ai";
+"personal.advanced_manual_key" = "高级：手动输入会话密钥";
 "about.run_setup_wizard" = "运行设置向导";
 
 /* ==================== */
@@ -858,6 +864,27 @@
 "mobile.privacy_note" = "不收集任何个人数据。这仅记录您的兴趣。";
 "mobile.error_title" = "请求失败";
 "mobile.error_message" = "无法注册您的兴趣。请检查您的网络连接并重试。";
+
+/* ==================== */
+/* MARK: - Popover Settings */
+/* ==================== */
+"section.popover_title" = "弹出窗口";
+"section.popover_desc" = "自定义弹出窗口显示";
+"section.app_settings_title" = "设置";
+"section.app_settings_desc" = "应用设置和启动";
+"popover.title" = "弹出窗口";
+"popover.subtitle" = "自定义弹出窗口如何显示使用信息";
+"popover.display_section" = "显示";
+"popover.time_display" = "时间显示";
+"popover.time_display_desc" = "选择重置时间的显示方式";
+"popover.time_display_reset" = "重置时间";
+"popover.time_display_remaining" = "剩余时间";
+"popover.time_display_both" = "两者";
+"popover.time_format" = "时间格式";
+"popover.time_format_desc" = "选择应用中时间的显示方式";
+"popover.time_format_system" = "系统";
+"popover.time_format_12h" = "12小时";
+"popover.time_format_24h" = "24小时";
 
 /* ==================== */
 /* MARK: - Feedback Prompt */

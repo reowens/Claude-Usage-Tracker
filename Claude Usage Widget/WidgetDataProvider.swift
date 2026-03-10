@@ -363,6 +363,8 @@ class WidgetDataProvider {
         let mediumLeftMetric: String
         let mediumRightMetric: String
         let showPaceMarker: Bool?
+        let paceMarkerStepColors: Bool?
+        let paceAwareBarColors: Bool?
         let refreshInterval: Int?
     }
 
@@ -618,6 +620,22 @@ class WidgetDataProvider {
         return defaults.bool(forKey: "widgetShowPaceMarker")
     }
 
+    /// Loads widget pace-aware bar colors setting
+    func loadWidgetPaceAwareBarColors() -> Bool {
+        // Try file first
+        if let settings = loadSettingsFromFile(),
+           let enabled = settings.paceAwareBarColors {
+            return enabled
+        }
+
+        // Fall back to UserDefaults
+        guard let defaults = defaults else { return false }
+        if defaults.object(forKey: "widgetPaceAwareBarColors") == nil {
+            return false  // Default off
+        }
+        return defaults.bool(forKey: "widgetPaceAwareBarColors")
+    }
+
     /// Loads widget refresh interval in minutes (default 15)
     func loadWidgetRefreshInterval() -> Int {
         if let settings = loadSettingsFromFile(),
@@ -664,6 +682,20 @@ class WidgetDataProvider {
         case .singleColor:
             return hexToColor(customColorHex) ?? .cyan
         }
+    }
+
+    /// Returns color for usage percentage with optional pace-aware projection
+    func colorForUsage(_ percentage: Double, mode: WidgetColorDisplayMode, customColorHex: String, elapsedFraction: Double?) -> Color {
+        // Pace-aware logic: project end-of-period usage when enough time has elapsed
+        if let t = elapsedFraction, mode == .multiColor, t >= 0.03, t < 1.0, percentage > 0 {
+            let projected = (percentage / 100.0) / t
+            switch projected {
+            case ..<0.75:     return .green    // safe
+            case 0.75..<0.95: return .orange   // moderate
+            default:          return .red      // critical
+            }
+        }
+        return colorForUsage(percentage, mode: mode, customColorHex: customColorHex)
     }
 
     /// Convert hex string to Color

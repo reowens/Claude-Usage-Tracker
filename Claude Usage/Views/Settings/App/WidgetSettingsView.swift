@@ -61,6 +61,7 @@ struct WidgetSettingsView: View {
     // Pace marker
     @State private var showPaceMarker: Bool = SharedDataStore.shared.loadWidgetShowPaceMarker()
     @State private var paceMarkerStepColors: Bool = SharedDataStore.shared.loadWidgetPaceMarkerStepColors()
+    @State private var paceAwareBarColors: Bool = SharedDataStore.shared.loadWidgetPaceAwareBarColors()
 
     // Refresh rate
     @State private var refreshInterval: Int = SharedDataStore.shared.loadWidgetRefreshInterval()
@@ -183,12 +184,12 @@ struct WidgetSettingsView: View {
     private var paceMarkerCard: some View {
         SettingsSectionCard(
             title: "Pace Marker",
-            subtitle: "Shows projected usage pace on progress indicators"
+            subtitle: "Track usage pace relative to reset periods"
         ) {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.medium) {
                 SettingToggle(
-                    title: "Show pace marker",
-                    description: "Display a colored dot showing your projected usage pace relative to the reset period",
+                    title: "Show Time Marker",
+                    description: "Display a tick mark on progress bars showing how far through the time period you are",
                     isOn: Binding(
                         get: { showPaceMarker },
                         set: { newValue in
@@ -214,6 +215,19 @@ struct WidgetSettingsView: View {
                     )
                     .padding(.leading, DesignTokens.Spacing.cardPadding)
                 }
+
+                SettingToggle(
+                    title: "Pace-Aware Bar Colors",
+                    description: "Color progress bar based on projected pace instead of current usage level",
+                    isOn: Binding(
+                        get: { paceAwareBarColors },
+                        set: { newValue in
+                            paceAwareBarColors = newValue
+                            SharedDataStore.shared.saveWidgetPaceAwareBarColors(newValue)
+                            refreshWidgets()
+                        }
+                    )
+                )
             }
         }
     }

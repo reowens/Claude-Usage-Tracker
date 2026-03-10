@@ -134,6 +134,7 @@ if [ -f "$config_file" ]; then
   show_profile=$SHOW_PROFILE
   profile_name="$PROFILE_NAME"
   pace_marker_step_colors=$PACE_MARKER_STEP_COLORS
+  pace_aware_bar_colors=$PACE_AWARE_BAR_COLORS
 else
   show_model=1
   show_dir=1
@@ -153,6 +154,7 @@ else
   show_profile=0
   profile_name=""
   pace_marker_step_colors=1
+  pace_aware_bar_colors=0
 fi
 
 input=$(cat)
@@ -390,6 +392,26 @@ if [ "$show_usage" = "1" ]; then
         usage_color="$LEVEL_9"
       else
         usage_color="$LEVEL_10"
+      fi
+
+      # Pace-aware bar colors: override usage_color based on projected pace
+      if [ "$pace_aware_bar_colors" = "1" ] && [ -n "$reset_epoch" ] && [ "$color_mode" = "colored" ]; then
+        now_epoch=$(date +%s)
+        remaining=$((reset_epoch - now_epoch))
+        if [ $remaining -gt 0 ] && [ $remaining -lt 18000 ]; then
+          elapsed_secs=$((18000 - remaining))
+          if [ $elapsed_secs -ge 540 ] && [ "$utilization" -gt 0 ]; then
+            # projected_pct = utilization * 18000 / elapsed_secs (integer math)
+            projected_pct=$((utilization * 18000 / elapsed_secs))
+            if [ $projected_pct -lt 75 ]; then
+              usage_color="$PACE_COMFORTABLE"  # green — safe
+            elif [ $projected_pct -lt 95 ]; then
+              usage_color="$PACE_WARMING"      # yellow — moderate
+            else
+              usage_color="$PACE_CRITICAL"     # red — critical
+            fi
+          fi
+        fi
       fi
 
       if [ "$show_bar" = "1" ]; then
@@ -635,6 +657,7 @@ printf "%s\\n" "$output"
         showProgressBar: Bool,
         showPaceMarker: Bool = true,
         paceMarkerStepColors: Bool = true,
+        paceAwareBarColors: Bool = false,
         showResetTime: Bool,
         use24HourTime: Bool = false,
         showContextLabel: Bool = true,
@@ -668,6 +691,7 @@ SHOW_USAGE=\(showUsage ? "1" : "0")
 SHOW_PROGRESS_BAR=\(showProgressBar ? "1" : "0")
 SHOW_PACE_MARKER=\(showPaceMarker ? "1" : "0")
 PACE_MARKER_STEP_COLORS=\(paceMarkerStepColors ? "1" : "0")
+PACE_AWARE_BAR_COLORS=\(paceAwareBarColors ? "1" : "0")
 SHOW_RESET_TIME=\(showResetTime ? "1" : "0")
 USE_24_HOUR_TIME=\(use24HourTime ? "1" : "0")
 SHOW_CONTEXT_LABEL=\(showContextLabel ? "1" : "0")

@@ -35,7 +35,8 @@ struct MediumWidgetView: View {
                         usage: usage,
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
-                        showPaceMarker: entry.showPaceMarker
+                        showPaceMarker: entry.showPaceMarker,
+                        usePaceColoring: entry.usePaceColoring
                     )
 
                     // Right card
@@ -44,7 +45,8 @@ struct MediumWidgetView: View {
                         usage: usage,
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
-                        showPaceMarker: entry.showPaceMarker
+                        showPaceMarker: entry.showPaceMarker,
+                        usePaceColoring: entry.usePaceColoring
                     )
                 }
             }
@@ -96,6 +98,7 @@ struct UsageCard: View {
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
     var showPaceMarker: Bool = true
+    var usePaceColoring: Bool = false
 
     private var metricData: MetricDisplayData {
         getMetricData(for: metric, usage: usage)
@@ -204,10 +207,14 @@ struct UsageCard: View {
     }
 
     private var statusColor: Color {
+        let elapsed: Double? = usePaceColoring
+            ? usage.paceData(for: metric)?.elapsed
+            : nil
         return WidgetDataProvider.shared.colorForUsage(
             metricData.percentage,
             mode: colorMode,
-            customColorHex: customColorHex
+            customColorHex: customColorHex,
+            elapsedFraction: elapsed
         )
     }
 

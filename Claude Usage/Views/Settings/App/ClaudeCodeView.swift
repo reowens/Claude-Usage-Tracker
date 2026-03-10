@@ -21,6 +21,7 @@ struct ClaudeCodeView: View {
     @State private var showProgressBar: Bool = SharedDataStore.shared.loadStatuslineShowProgressBar()
     @State private var showPaceMarker: Bool = SharedDataStore.shared.loadStatuslineShowPaceMarker()
     @State private var paceMarkerStepColors: Bool = SharedDataStore.shared.loadStatuslinePaceMarkerStepColors()
+    @State private var paceAwareBarColors: Bool = SharedDataStore.shared.loadStatuslinePaceAwareBarColors()
     @State private var showResetTime: Bool = SharedDataStore.shared.loadStatuslineShowResetTime()
     @State private var showProfile: Bool = SharedDataStore.shared.loadStatuslineShowProfile()
     @State private var use24HourTime: Bool = SharedDataStore.shared.loadStatuslineUse24HourTime()
@@ -217,6 +218,13 @@ struct ClaudeCodeView: View {
                                             )
                                             .padding(.leading, DesignTokens.Spacing.cardPadding * 2)
                                         }
+
+                                        SettingToggle(
+                                            title: "Pace-Aware Bar Colors",
+                                            description: "Color progress bar based on projected pace instead of current usage level",
+                                            isOn: $paceAwareBarColors
+                                        )
+                                        .padding(.leading, DesignTokens.Spacing.cardPadding)
                                     }
 
                                     SettingToggle(
@@ -649,6 +657,7 @@ struct ClaudeCodeView: View {
         SharedDataStore.shared.saveStatuslineShowProgressBar(showProgressBar)
         SharedDataStore.shared.saveStatuslineShowPaceMarker(showPaceMarker)
         SharedDataStore.shared.saveStatuslinePaceMarkerStepColors(paceMarkerStepColors)
+        SharedDataStore.shared.saveStatuslinePaceAwareBarColors(paceAwareBarColors)
         SharedDataStore.shared.saveStatuslineShowResetTime(showResetTime)
         SharedDataStore.shared.saveStatuslineShowProfile(showProfile)
         SharedDataStore.shared.saveStatuslineUse24HourTime(use24HourTime)
@@ -669,6 +678,7 @@ struct ClaudeCodeView: View {
                 showProgressBar: showProgressBar,
                 showPaceMarker: showPaceMarker,
                 paceMarkerStepColors: paceMarkerStepColors,
+                paceAwareBarColors: paceAwareBarColors,
                 showResetTime: showResetTime,
                 use24HourTime: use24HourTime,
                 showContextLabel: showContextLabel,

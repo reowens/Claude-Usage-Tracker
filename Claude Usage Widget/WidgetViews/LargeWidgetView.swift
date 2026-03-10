@@ -46,6 +46,7 @@ struct LargeWidgetView: View {
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
                         showPaceMarker: entry.showPaceMarker,
+                        usePaceColoring: entry.usePaceColoring,
                         elapsedFraction: sessionPace?.elapsed,
                         paceStatus: sessionPace?.pace
                     )
@@ -60,6 +61,7 @@ struct LargeWidgetView: View {
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
                         showPaceMarker: entry.showPaceMarker,
+                        usePaceColoring: entry.usePaceColoring,
                         elapsedFraction: weeklyPace?.elapsed,
                         paceStatus: weeklyPace?.pace
                     )
@@ -231,6 +233,7 @@ struct MetricTile: View {
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
     var showPaceMarker: Bool = true
+    var usePaceColoring: Bool = false
     var elapsedFraction: Double? = nil
     var paceStatus: WidgetPaceStatus? = nil
 
@@ -290,7 +293,8 @@ struct MetricTile: View {
         return WidgetDataProvider.shared.colorForUsage(
             percentage,
             mode: colorMode,
-            customColorHex: customColorHex
+            customColorHex: customColorHex,
+            elapsedFraction: usePaceColoring ? elapsedFraction : nil
         )
     }
 }

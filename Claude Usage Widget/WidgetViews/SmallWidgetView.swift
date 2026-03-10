@@ -159,10 +159,14 @@ struct SmallWidgetView: View {
     }
 
     private func statusColor(for percentage: Double) -> Color {
+        let elapsed: Double? = entry.usePaceColoring
+            ? entry.usage?.paceData(for: entry.smallMetric)?.elapsed
+            : nil
         return WidgetDataProvider.shared.colorForUsage(
             percentage,
             mode: entry.colorMode,
-            customColorHex: entry.customColorHex
+            customColorHex: entry.customColorHex,
+            elapsedFraction: elapsed
         )
     }
 }

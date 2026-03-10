@@ -35,6 +35,7 @@ class SharedDataStore {
         static let statuslineShowContextLabel = "statuslineShowContextLabel"
         static let statuslineShowProfile = "statuslineShowProfile"
         static let statuslinePaceMarkerStepColors = "statuslinePaceMarkerStepColors"
+        static let statuslinePaceAwareBarColors = "statuslinePaceAwareBarColors"
 
         // Widget Settings
         static let smallWidgetMetric = "smallWidgetMetric"
@@ -44,6 +45,7 @@ class SharedDataStore {
         static let widgetSingleColorHex = "widgetSingleColorHex"
         static let widgetShowPaceMarker = "widgetShowPaceMarker"
         static let widgetPaceMarkerStepColors = "widgetPaceMarkerStepColors"
+        static let widgetPaceAwareBarColors = "widgetPaceAwareBarColors"
         static let widgetRefreshInterval = "widgetRefreshInterval"
         static let extraUsageDisplayFormat = "extraUsageDisplayFormat"
 
@@ -178,6 +180,17 @@ class SharedDataStore {
             return true  // Default to step colors
         }
         return defaults.bool(forKey: Keys.statuslinePaceMarkerStepColors)
+    }
+
+    func saveStatuslinePaceAwareBarColors(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Keys.statuslinePaceAwareBarColors)
+    }
+
+    func loadStatuslinePaceAwareBarColors() -> Bool {
+        if defaults.object(forKey: Keys.statuslinePaceAwareBarColors) == nil {
+            return false  // Default off
+        }
+        return defaults.bool(forKey: Keys.statuslinePaceAwareBarColors)
     }
 
     func saveStatuslineShowResetTime(_ show: Bool) {
@@ -388,6 +401,19 @@ class SharedDataStore {
         return defaults.bool(forKey: Keys.widgetPaceMarkerStepColors)
     }
 
+    func saveWidgetPaceAwareBarColors(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Keys.widgetPaceAwareBarColors)
+        syncToWidget(key: Keys.widgetPaceAwareBarColors, value: enabled)
+        saveWidgetSettingsToFile()
+    }
+
+    func loadWidgetPaceAwareBarColors() -> Bool {
+        if defaults.object(forKey: Keys.widgetPaceAwareBarColors) == nil {
+            return false  // Default off
+        }
+        return defaults.bool(forKey: Keys.widgetPaceAwareBarColors)
+    }
+
     func saveWidgetRefreshInterval(_ minutes: Int) {
         defaults.set(minutes, forKey: Keys.widgetRefreshInterval)
         syncToWidget(key: Keys.widgetRefreshInterval, value: minutes)
@@ -425,6 +451,7 @@ class SharedDataStore {
         let mediumRightMetric: String
         let showPaceMarker: Bool?
         let paceMarkerStepColors: Bool?
+        let paceAwareBarColors: Bool?
         let refreshInterval: Int?
     }
 
@@ -444,6 +471,7 @@ class SharedDataStore {
             mediumRightMetric: loadMediumWidgetRightMetric().rawValue,
             showPaceMarker: loadWidgetShowPaceMarker(),
             paceMarkerStepColors: loadWidgetPaceMarkerStepColors(),
+            paceAwareBarColors: loadWidgetPaceAwareBarColors(),
             refreshInterval: loadWidgetRefreshInterval()
         )
 

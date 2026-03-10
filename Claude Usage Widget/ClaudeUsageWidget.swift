@@ -39,7 +39,8 @@ struct UsageTimelineProvider: TimelineProvider {
             mediumRightMetric: provider.loadMediumWidgetRightMetric(),
             colorMode: provider.loadWidgetColorMode(),
             customColorHex: provider.loadWidgetSingleColorHex(),
-            showPaceMarker: provider.loadWidgetShowPaceMarker()
+            showPaceMarker: provider.loadWidgetShowPaceMarker(),
+            usePaceColoring: provider.loadWidgetPaceAwareBarColors()
         )
         completion(entry)
     }
@@ -56,7 +57,8 @@ struct UsageTimelineProvider: TimelineProvider {
             mediumRightMetric: provider.loadMediumWidgetRightMetric(),
             colorMode: provider.loadWidgetColorMode(),
             customColorHex: provider.loadWidgetSingleColorHex(),
-            showPaceMarker: provider.loadWidgetShowPaceMarker()
+            showPaceMarker: provider.loadWidgetShowPaceMarker(),
+            usePaceColoring: provider.loadWidgetPaceAwareBarColors()
         )
 
         // Refresh at user-configured interval (default 15 minutes)
@@ -77,6 +79,7 @@ struct UsageEntry: TimelineEntry {
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
     let showPaceMarker: Bool
+    let usePaceColoring: Bool
 
     init(
         date: Date,
@@ -87,7 +90,8 @@ struct UsageEntry: TimelineEntry {
         mediumRightMetric: WidgetSmallMetric = .weekly,
         colorMode: WidgetColorDisplayMode = .multiColor,
         customColorHex: String = "#00BFFF",
-        showPaceMarker: Bool = true
+        showPaceMarker: Bool = true,
+        usePaceColoring: Bool = false
     ) {
         self.date = date
         self.usage = usage
@@ -98,6 +102,7 @@ struct UsageEntry: TimelineEntry {
         self.colorMode = colorMode
         self.customColorHex = customColorHex
         self.showPaceMarker = showPaceMarker
+        self.usePaceColoring = usePaceColoring
     }
 }
 

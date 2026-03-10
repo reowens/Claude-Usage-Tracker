@@ -120,6 +120,7 @@ Temporary Items
 .claude-session-key
 
 .claude
+CLAUDE.md
 
 # Backup files
 *.backup.*

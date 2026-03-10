@@ -74,7 +74,7 @@ class MenuBarManager: NSObject, ObservableObject {
     private var refreshIntervalObserver: NSKeyValueObservation?
 
     // Observer for appearance changes
-    private var appearanceObserver: NSKeyValueObservation?
+    // appearanceObserver removed — handled by StatusBarUIManager delegate
 
     // Observer for icon style changes
     private var iconStyleObserver: NSObjectProtocol?
@@ -200,8 +200,8 @@ class MenuBarManager: NSObject, ObservableObject {
         // Start auto-start session service (5-minute cycle for all profiles)
         autoStartService.start()
 
-        // Observe appearance changes
-        observeAppearanceChanges()
+        // Appearance changes are handled by StatusBarUIManager via the delegate pattern.
+        // Do NOT observe NSApp.effectiveAppearance here — it causes duplicate redraws.
 
         // Observe icon configuration changes
         observeIconConfigChanges()
@@ -248,8 +248,7 @@ class MenuBarManager: NSObject, ObservableObject {
         cancellables.removeAll()  // Clean up Combine subscriptions
         refreshIntervalObserver?.invalidate()
         refreshIntervalObserver = nil
-        appearanceObserver?.invalidate()
-        appearanceObserver = nil
+        // appearanceObserver removed — appearance handled by StatusBarUIManager delegate
         if let iconStyleObserver = iconStyleObserver {
             NotificationCenter.default.removeObserver(iconStyleObserver)
             self.iconStyleObserver = nil
@@ -691,13 +690,8 @@ class MenuBarManager: NSObject, ObservableObject {
         }
     }
 
-    private func observeAppearanceChanges() {
-        // Appearance observation is handled by StatusBarUIManager which observes
-        // each button's effectiveAppearance (important for per-display wallpaper)
-        // and NSApp.effectiveAppearance as fallback. Changes are routed through
-        // the StatusBarUIManagerDelegate.statusBarAppearanceDidChange() callback.
-        // No additional observer needed here to avoid duplicate redraws.
-    }
+    // Appearance observation is handled by StatusBarUIManager via the delegate pattern.
+    // Removed observeAppearanceChanges() to prevent duplicate redraws.
 
     private func observeIconStyleChanges() {
         // Observe icon style changes from settings (now consolidated with menuBarIconConfigChanged)
@@ -1693,15 +1687,9 @@ extension MenuBarManager: NSPopoverDelegate {
 // MARK: - StatusBarUIManagerDelegate
 extension MenuBarManager: StatusBarUIManagerDelegate {
     func statusBarAppearanceDidChange() {
-        // Debounce appearance changes — multiple displays and wallpaper-based appearance
-        // can fire many rapid changes. Coalesce into a single redraw after 0.15s of quiet.
-        updateDebounceTimer?.invalidate()
-        updateDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            self.cachedIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            self.cachedImageKey = ""
-            self.updateAllStatusBarIcons()
-        }
+        cachedIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        cachedImageKey = ""
+        updateAllStatusBarIcons()
     }
 }
 

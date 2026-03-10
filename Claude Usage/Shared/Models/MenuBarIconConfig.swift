@@ -331,8 +331,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         // New properties - provide default values if missing (backwards compatibility)
         useSystemColor = try container.decodeIfPresent(Bool.self, forKey: .useSystemColor) ?? false
         showTimeMarker = try container.decodeIfPresent(Bool.self, forKey: .showTimeMarker) ?? true
-        showPaceMarker = try container.decodeIfPresent(Bool.self, forKey: .showPaceMarker) ?? true
-        usePaceColoring = try container.decodeIfPresent(Bool.self, forKey: .usePaceColoring) ?? true
+        showPaceMarker = try container.decodeIfPresent(Bool.self, forKey: .showPaceMarker) ?? false
+        usePaceColoring = try container.decodeIfPresent(Bool.self, forKey: .usePaceColoring) ?? false
     }
 
     static var `default`: MultiProfileDisplayConfig {
@@ -403,8 +403,8 @@ struct MenuBarIconConfiguration: Codable, Equatable {
         showIconNames = try container.decode(Bool.self, forKey: .showIconNames)
         showRemainingPercentage = try container.decodeIfPresent(Bool.self, forKey: .showRemainingPercentage) ?? false
         showTimeMarker = try container.decodeIfPresent(Bool.self, forKey: .showTimeMarker) ?? true
-        showPaceMarker = try container.decodeIfPresent(Bool.self, forKey: .showPaceMarker) ?? true
-        usePaceColoring = try container.decodeIfPresent(Bool.self, forKey: .usePaceColoring) ?? true
+        showPaceMarker = try container.decodeIfPresent(Bool.self, forKey: .showPaceMarker) ?? false
+        usePaceColoring = try container.decodeIfPresent(Bool.self, forKey: .usePaceColoring) ?? false
         metrics = try container.decode([MetricIconConfig].self, forKey: .metrics)
     }
 

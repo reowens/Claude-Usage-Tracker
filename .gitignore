@@ -121,6 +121,7 @@ Temporary Items
 
 .claude
 CLAUDE.md
+justfile
 
 # Backup files
 *.backup.*

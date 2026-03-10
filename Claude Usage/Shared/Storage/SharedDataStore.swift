@@ -43,6 +43,7 @@ class SharedDataStore {
         static let widgetColorMode = "widgetColorMode"
         static let widgetSingleColorHex = "widgetSingleColorHex"
         static let widgetShowPaceMarker = "widgetShowPaceMarker"
+        static let widgetPaceMarkerStepColors = "widgetPaceMarkerStepColors"
         static let widgetRefreshInterval = "widgetRefreshInterval"
         static let extraUsageDisplayFormat = "extraUsageDisplayFormat"
 
@@ -374,6 +375,19 @@ class SharedDataStore {
         return defaults.bool(forKey: Keys.widgetShowPaceMarker)
     }
 
+    func saveWidgetPaceMarkerStepColors(_ useStepColors: Bool) {
+        defaults.set(useStepColors, forKey: Keys.widgetPaceMarkerStepColors)
+        syncToWidget(key: Keys.widgetPaceMarkerStepColors, value: useStepColors)
+        saveWidgetSettingsToFile()
+    }
+
+    func loadWidgetPaceMarkerStepColors() -> Bool {
+        if defaults.object(forKey: Keys.widgetPaceMarkerStepColors) == nil {
+            return true  // Default to 6-color scale
+        }
+        return defaults.bool(forKey: Keys.widgetPaceMarkerStepColors)
+    }
+
     func saveWidgetRefreshInterval(_ minutes: Int) {
         defaults.set(minutes, forKey: Keys.widgetRefreshInterval)
         syncToWidget(key: Keys.widgetRefreshInterval, value: minutes)
@@ -410,6 +424,7 @@ class SharedDataStore {
         let mediumLeftMetric: String
         let mediumRightMetric: String
         let showPaceMarker: Bool?
+        let paceMarkerStepColors: Bool?
         let refreshInterval: Int?
     }
 
@@ -428,6 +443,7 @@ class SharedDataStore {
             mediumLeftMetric: loadMediumWidgetLeftMetric().rawValue,
             mediumRightMetric: loadMediumWidgetRightMetric().rawValue,
             showPaceMarker: loadWidgetShowPaceMarker(),
+            paceMarkerStepColors: loadWidgetPaceMarkerStepColors(),
             refreshInterval: loadWidgetRefreshInterval()
         )
 

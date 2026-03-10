@@ -60,6 +60,7 @@ struct WidgetSettingsView: View {
 
     // Pace marker
     @State private var showPaceMarker: Bool = SharedDataStore.shared.loadWidgetShowPaceMarker()
+    @State private var paceMarkerStepColors: Bool = SharedDataStore.shared.loadWidgetPaceMarkerStepColors()
 
     // Refresh rate
     @State private var refreshInterval: Int = SharedDataStore.shared.loadWidgetRefreshInterval()
@@ -134,15 +135,23 @@ struct WidgetSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
 
+                            if mode == .singleColor && selectedColorMode == .singleColor {
+                                ColorPicker("", selection: Binding(
+                                    get: { singleColor },
+                                    set: { newColor in
+                                        singleColor = newColor
+                                        SharedDataStore.shared.saveWidgetSingleColorHex(newColor.toHex() ?? "#00BFFF")
+                                        refreshWidgets()
+                                    }
+                                ))
+                                .labelsHidden()
+                            }
+
                             Spacer()
                         }
                         .padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
-                }
-
-                if selectedColorMode == .singleColor {
-                    colorPickerRow
                 }
             }
         }
@@ -189,6 +198,22 @@ struct WidgetSettingsView: View {
                         }
                     )
                 )
+
+                if showPaceMarker {
+                    SettingToggle(
+                        title: "Use 6-color scale",
+                        description: "6-tier projected pace (green → purple)",
+                        isOn: Binding(
+                            get: { paceMarkerStepColors },
+                            set: { newValue in
+                                paceMarkerStepColors = newValue
+                                SharedDataStore.shared.saveWidgetPaceMarkerStepColors(newValue)
+                                refreshWidgets()
+                            }
+                        )
+                    )
+                    .padding(.leading, DesignTokens.Spacing.cardPadding)
+                }
             }
         }
     }

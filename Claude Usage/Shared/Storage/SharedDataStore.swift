@@ -40,6 +40,8 @@ class SharedDataStore {
         static let mediumWidgetRightMetric = "mediumWidgetRightMetric"
         static let widgetColorMode = "widgetColorMode"
         static let widgetSingleColorHex = "widgetSingleColorHex"
+        static let widgetShowPaceMarker = "widgetShowPaceMarker"
+        static let widgetRefreshInterval = "widgetRefreshInterval"
         static let extraUsageDisplayFormat = "extraUsageDisplayFormat"
 
         // Setup State
@@ -332,6 +334,30 @@ class SharedDataStore {
         return defaults.string(forKey: Keys.widgetSingleColorHex) ?? "#00BFFF"  // Default cyan
     }
 
+    func saveWidgetShowPaceMarker(_ show: Bool) {
+        defaults.set(show, forKey: Keys.widgetShowPaceMarker)
+        defaults.synchronize()
+        saveWidgetSettingsToFile()
+    }
+
+    func loadWidgetShowPaceMarker() -> Bool {
+        if defaults.object(forKey: Keys.widgetShowPaceMarker) == nil {
+            return true  // Default to showing pace markers
+        }
+        return defaults.bool(forKey: Keys.widgetShowPaceMarker)
+    }
+
+    func saveWidgetRefreshInterval(_ minutes: Int) {
+        defaults.set(minutes, forKey: Keys.widgetRefreshInterval)
+        defaults.synchronize()
+        saveWidgetSettingsToFile()
+    }
+
+    func loadWidgetRefreshInterval() -> Int {
+        let value = defaults.integer(forKey: Keys.widgetRefreshInterval)
+        return value > 0 ? value : 15  // Default 15 minutes
+    }
+
     func saveExtraUsageDisplayFormat(_ format: ExtraUsageDisplayFormat) {
         defaults.set(format.rawValue, forKey: Keys.extraUsageDisplayFormat)
         defaults.synchronize()  // Force sync before widget reads
@@ -357,6 +383,8 @@ class SharedDataStore {
         let smallMetric: String
         let mediumLeftMetric: String
         let mediumRightMetric: String
+        let showPaceMarker: Bool?
+        let refreshInterval: Int?
     }
 
     /// Saves all widget settings to a file for reliable cross-process sync
@@ -372,7 +400,9 @@ class SharedDataStore {
             extraUsageFormat: loadExtraUsageDisplayFormat().rawValue,
             smallMetric: loadSmallWidgetMetric().rawValue,
             mediumLeftMetric: loadMediumWidgetLeftMetric().rawValue,
-            mediumRightMetric: loadMediumWidgetRightMetric().rawValue
+            mediumRightMetric: loadMediumWidgetRightMetric().rawValue,
+            showPaceMarker: loadWidgetShowPaceMarker(),
+            refreshInterval: loadWidgetRefreshInterval()
         )
 
         let encoder = JSONEncoder()

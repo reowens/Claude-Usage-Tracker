@@ -14,7 +14,7 @@ struct ClaudeUsageWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: UsageTimelineProvider()) { entry in
             ClaudeUsageWidgetEntryView(entry: entry)
-                .containerBackground(.ultraThinMaterial, for: .widget)
+                .containerBackground(Color.black.opacity(0.2), for: .widget)
         }
         .configurationDisplayName("Claude Usage")
         .description("Monitor your Claude AI usage at a glance.")
@@ -38,7 +38,8 @@ struct UsageTimelineProvider: TimelineProvider {
             mediumLeftMetric: provider.loadMediumWidgetLeftMetric(),
             mediumRightMetric: provider.loadMediumWidgetRightMetric(),
             colorMode: provider.loadWidgetColorMode(),
-            customColorHex: provider.loadWidgetSingleColorHex()
+            customColorHex: provider.loadWidgetSingleColorHex(),
+            showPaceMarker: provider.loadWidgetShowPaceMarker()
         )
         completion(entry)
     }
@@ -54,11 +55,13 @@ struct UsageTimelineProvider: TimelineProvider {
             mediumLeftMetric: provider.loadMediumWidgetLeftMetric(),
             mediumRightMetric: provider.loadMediumWidgetRightMetric(),
             colorMode: provider.loadWidgetColorMode(),
-            customColorHex: provider.loadWidgetSingleColorHex()
+            customColorHex: provider.loadWidgetSingleColorHex(),
+            showPaceMarker: provider.loadWidgetShowPaceMarker()
         )
 
-        // Refresh every 15 minutes
-        let refreshDate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate) ?? currentDate.addingTimeInterval(900)
+        // Refresh at user-configured interval (default 15 minutes)
+        let refreshMinutes = provider.loadWidgetRefreshInterval()
+        let refreshDate = Calendar.current.date(byAdding: .minute, value: refreshMinutes, to: currentDate) ?? currentDate.addingTimeInterval(TimeInterval(refreshMinutes * 60))
         let timeline = Timeline(entries: [entry], policy: .after(refreshDate))
         completion(timeline)
     }
@@ -73,6 +76,7 @@ struct UsageEntry: TimelineEntry {
     let mediumRightMetric: WidgetSmallMetric
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
+    let showPaceMarker: Bool
 
     init(
         date: Date,
@@ -82,7 +86,8 @@ struct UsageEntry: TimelineEntry {
         mediumLeftMetric: WidgetSmallMetric = .session,
         mediumRightMetric: WidgetSmallMetric = .weekly,
         colorMode: WidgetColorDisplayMode = .multiColor,
-        customColorHex: String = "#00BFFF"
+        customColorHex: String = "#00BFFF",
+        showPaceMarker: Bool = true
     ) {
         self.date = date
         self.usage = usage
@@ -92,6 +97,7 @@ struct UsageEntry: TimelineEntry {
         self.mediumRightMetric = mediumRightMetric
         self.colorMode = colorMode
         self.customColorHex = customColorHex
+        self.showPaceMarker = showPaceMarker
     }
 }
 

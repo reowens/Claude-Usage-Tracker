@@ -45,6 +45,7 @@ struct LargeWidgetView: View {
                         icon: "clock.fill",
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
+                        showPaceMarker: entry.showPaceMarker,
                         elapsedFraction: sessionPace?.elapsed,
                         paceStatus: sessionPace?.pace
                     )
@@ -58,6 +59,7 @@ struct LargeWidgetView: View {
                         icon: "calendar",
                         colorMode: entry.colorMode,
                         customColorHex: entry.customColorHex,
+                        showPaceMarker: entry.showPaceMarker,
                         elapsedFraction: weeklyPace?.elapsed,
                         paceStatus: weeklyPace?.pace
                     )
@@ -69,9 +71,10 @@ struct LargeWidgetView: View {
                             title: "Opus",
                             percentage: usage.opusPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
-                            icon: "star.fill",
+                            icon: "brain",
                             colorMode: entry.colorMode,
                             customColorHex: entry.customColorHex,
+                            showPaceMarker: entry.showPaceMarker,
                             elapsedFraction: opusPace?.elapsed,
                             paceStatus: opusPace?.pace
                         )
@@ -89,9 +92,10 @@ struct LargeWidgetView: View {
                             title: "Opus",
                             percentage: usage.opusPercentage,
                             subtitle: WidgetDateFormatter.shortTimeString(from: usage.weeklyResetTime),
-                            icon: "star.fill",
+                            icon: "brain",
                             colorMode: entry.colorMode,
                             customColorHex: entry.customColorHex,
+                            showPaceMarker: entry.showPaceMarker,
                             elapsedFraction: opusPace?.elapsed,
                             paceStatus: opusPace?.pace
                         )
@@ -107,6 +111,7 @@ struct LargeWidgetView: View {
                             icon: "bolt.fill",
                             colorMode: entry.colorMode,
                             customColorHex: entry.customColorHex,
+                            showPaceMarker: entry.showPaceMarker,
                             elapsedFraction: sonnetPace?.elapsed,
                             paceStatus: sonnetPace?.pace
                         )
@@ -128,6 +133,7 @@ struct LargeWidgetView: View {
                             icon: "bolt.fill",
                             colorMode: entry.colorMode,
                             customColorHex: entry.customColorHex,
+                            showPaceMarker: entry.showPaceMarker,
                             elapsedFraction: sonnetPace?.elapsed,
                             paceStatus: sonnetPace?.pace
                         )
@@ -215,17 +221,6 @@ struct LargeWidgetView: View {
         return "Updated \(formatter.localizedString(for: date, relativeTo: Date()))"
     }
 
-    private func statusLevel(for percentage: Double) -> WidgetStatusLevel {
-        switch percentage {
-        case 0..<50:
-            return .safe
-        case 50..<80:
-            return .moderate
-        default:
-            return .critical
-        }
-    }
-
 }
 
 struct MetricTile: View {
@@ -235,6 +230,7 @@ struct MetricTile: View {
     let icon: String
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
+    var showPaceMarker: Bool = true
     var elapsedFraction: Double? = nil
     var paceStatus: WidgetPaceStatus? = nil
 
@@ -263,17 +259,18 @@ struct MetricTile: View {
                         .fill(statusColor)
                         .frame(width: geometry.size.width * min(percentage / 100, 1.0))
 
-                    // Pace marker tick
-                    if let fraction = elapsedFraction, let pace = paceStatus {
+                    // Pace marker dot on bottom edge of progress bar
+                    if showPaceMarker, let fraction = elapsedFraction, let pace = paceStatus {
                         let tickX = geometry.size.width * fraction
-                        RoundedRectangle(cornerRadius: 0.5)
+                        Circle()
                             .fill(pace.color)
-                            .frame(width: 1.5, height: WidgetDesign.Spacing.progressHeight)
-                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight / 2)
+                            .frame(width: 5, height: 5)
+                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight)
                     }
                 }
             }
             .frame(height: WidgetDesign.Spacing.progressHeight)
+            .padding(.bottom, 3)
 
             Text(subtitle)
                 .font(.system(size: WidgetDesign.Typography.timestamp))

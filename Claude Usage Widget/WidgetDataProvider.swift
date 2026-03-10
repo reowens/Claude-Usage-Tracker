@@ -151,6 +151,14 @@ enum WidgetStatusLevel {
     case safe
     case moderate
     case critical
+
+    static func from(percentage: Double) -> WidgetStatusLevel {
+        switch percentage {
+        case 0..<50:  return .safe
+        case 50..<80: return .moderate
+        default:      return .critical
+        }
+    }
 }
 
 /// Widget small metric selection (mirrors main app's SmallWidgetMetric)
@@ -175,7 +183,7 @@ enum WidgetSmallMetric: String {
         switch self {
         case .session: return "clock.fill"
         case .weekly: return "calendar"
-        case .opus: return "star.fill"
+        case .opus: return "brain"
         case .sonnet: return "bolt.fill"
         case .extra: return "dollarsign.circle.fill"
         }
@@ -209,6 +217,17 @@ enum WidgetDateFormatter {
     /// Formats time as short string for tiles (no prefix)
     static func shortTimeString(from date: Date) -> String {
         return exactTime(from: date)
+    }
+
+    /// Formats session reset time as "Resets X:XXAM/PM" (no day prefix)
+    static func sessionResetTimeString(from date: Date) -> String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        let roundedDate = roundToNearestMinute(date, using: calendar)
+        formatter.dateFormat = "'Resets' h:mma"
+        return formatter.string(from: roundedDate)
+            .replacingOccurrences(of: "am", with: "AM")
+            .replacingOccurrences(of: "pm", with: "PM")
     }
 
     private static func exactTime(from date: Date) -> String {
@@ -343,6 +362,8 @@ class WidgetDataProvider {
         let smallMetric: String
         let mediumLeftMetric: String
         let mediumRightMetric: String
+        let showPaceMarker: Bool?
+        let refreshInterval: Int?
     }
 
     /// Loads widget settings from file (refreshes cache if stale)
@@ -579,6 +600,33 @@ class WidgetDataProvider {
 
         // Fall back to UserDefaults
         return defaults?.string(forKey: "widgetSingleColorHex") ?? "#00BFFF"  // Default cyan
+    }
+
+    /// Loads widget pace marker visibility setting
+    func loadWidgetShowPaceMarker() -> Bool {
+        // Try file first
+        if let settings = loadSettingsFromFile(),
+           let show = settings.showPaceMarker {
+            return show
+        }
+
+        // Fall back to UserDefaults
+        guard let defaults = defaults else { return true }
+        if defaults.object(forKey: "widgetShowPaceMarker") == nil {
+            return true  // Default to showing pace markers
+        }
+        return defaults.bool(forKey: "widgetShowPaceMarker")
+    }
+
+    /// Loads widget refresh interval in minutes (default 15)
+    func loadWidgetRefreshInterval() -> Int {
+        if let settings = loadSettingsFromFile(),
+           let interval = settings.refreshInterval, interval > 0 {
+            return interval
+        }
+        guard let defaults = defaults else { return 15 }
+        let value = defaults.integer(forKey: "widgetRefreshInterval")
+        return value > 0 ? value : 15
     }
 
     /// Loads extra usage display format from shared storage

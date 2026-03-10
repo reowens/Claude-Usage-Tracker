@@ -11,7 +11,6 @@ import SwiftUI
 struct AppearanceSettingsView: View {
     @ObservedObject private var profileManager = ProfileManager.shared
     @State private var configuration: MenuBarIconConfiguration = .default
-    @State private var saveDebounceTimer: Timer?
 
     private var isMultiProfileMode: Bool {
         profileManager.displayMode == .multi
@@ -73,7 +72,17 @@ struct AppearanceSettingsView: View {
                                 }
                             )
                         )
+                    }
+                }
+                .disabled(isMultiProfileMode)
+                .opacity(isMultiProfileMode ? 0.5 : 1.0)
 
+                // Pace Marker
+                SettingsSectionCard(
+                    title: "appearance.pace_marker_section_title".localized,
+                    subtitle: "appearance.pace_marker_section_subtitle".localized
+                ) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.cardPadding) {
                         SettingToggle(
                             title: "appearance.show_time_marker_title".localized,
                             description: "appearance.show_time_marker_description".localized,

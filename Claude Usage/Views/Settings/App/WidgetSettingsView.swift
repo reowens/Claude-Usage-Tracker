@@ -58,6 +58,12 @@ struct WidgetSettingsView: View {
     @State private var mediumLeftMetric: SmallWidgetMetric = SharedDataStore.shared.loadMediumWidgetLeftMetric()
     @State private var mediumRightMetric: SmallWidgetMetric = SharedDataStore.shared.loadMediumWidgetRightMetric()
 
+    // Pace marker
+    @State private var showPaceMarker: Bool = SharedDataStore.shared.loadWidgetShowPaceMarker()
+
+    // Refresh rate
+    @State private var refreshInterval: Int = SharedDataStore.shared.loadWidgetRefreshInterval()
+
     // Actual usage data for previews
     @State private var previewUsage: ClaudeUsage?
 
@@ -71,9 +77,10 @@ struct WidgetSettingsView: View {
                 )
 
                 widgetColorsCard
+                paceMarkerCard
                 smallWidgetSection
                 mediumWidgetSection
-                aboutWidgetsSection
+                refreshRateSection
 
                 Spacer()
             }
@@ -164,6 +171,28 @@ struct WidgetSettingsView: View {
         .padding(.vertical, 4)
     }
 
+    private var paceMarkerCard: some View {
+        SettingsSectionCard(
+            title: "Pace Marker",
+            subtitle: "Shows projected usage pace on progress indicators"
+        ) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.medium) {
+                SettingToggle(
+                    title: "Show pace marker",
+                    description: "Display a colored dot showing your projected usage pace relative to the reset period",
+                    isOn: Binding(
+                        get: { showPaceMarker },
+                        set: { newValue in
+                            showPaceMarker = newValue
+                            SharedDataStore.shared.saveWidgetShowPaceMarker(newValue)
+                            refreshWidgets()
+                        }
+                    )
+                )
+            }
+        }
+    }
+
     private var smallWidgetSection: some View {
         SettingsSectionCard(
             title: "Small Widget",
@@ -174,6 +203,7 @@ struct WidgetSettingsView: View {
                     metric: selectedSmallMetric,
                     colorMode: selectedColorMode,
                     customColor: singleColor,
+                    showPaceMarker: showPaceMarker,
                     usage: previewUsage
                 )
 
@@ -205,6 +235,7 @@ struct WidgetSettingsView: View {
                     rightMetric: mediumRightMetric,
                     colorMode: selectedColorMode,
                     customColor: singleColor,
+                    showPaceMarker: showPaceMarker,
                     usage: previewUsage
                 )
                 .frame(maxWidth: .infinity)
@@ -277,33 +308,38 @@ struct WidgetSettingsView: View {
         }
     }
 
-    private var aboutWidgetsSection: some View {
+    private var refreshRateSection: some View {
         SettingsSectionCard(
-            title: "About Widgets",
-            subtitle: "How to add widgets to your desktop"
+            title: "Refresh Rate",
+            subtitle: "How often widgets update when the app is closed"
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                InfoRow(
-                    icon: "plus.rectangle.on.rectangle",
-                    title: "Add Widget",
-                    description: "Right-click on your desktop and select \"Edit Widgets\" to add Claude Usage widgets"
-                )
+            HStack {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 20)
 
-                Divider()
+                Text("Update every")
+                    .font(.system(size: 13))
 
-                InfoRow(
-                    icon: "square.resize",
-                    title: "Widget Sizes",
-                    description: "Available in small (single metric), medium (two metrics), and large (full dashboard) sizes"
-                )
+                Picker("", selection: Binding(
+                    get: { refreshInterval },
+                    set: { newValue in
+                        refreshInterval = newValue
+                        SharedDataStore.shared.saveWidgetRefreshInterval(newValue)
+                        refreshWidgets()
+                    }
+                )) {
+                    Text("5 minutes").tag(5)
+                    Text("10 minutes").tag(10)
+                    Text("15 minutes").tag(15)
+                    Text("30 minutes").tag(30)
+                    Text("60 minutes").tag(60)
+                }
+                .labelsHidden()
+                .frame(width: 140)
 
-                Divider()
-
-                InfoRow(
-                    icon: "arrow.clockwise",
-                    title: "Refresh Rate",
-                    description: "Widgets refresh instantly when the app is active, or automatically every 15 minutes when the app is closed"
-                )
+                Spacer()
             }
         }
     }
@@ -426,41 +462,13 @@ private struct MetricOptionRow: View {
     }
 }
 
-// MARK: - Info Row
-
-private struct InfoRow: View {
-    let icon: String
-    let title: String
-    let description: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(.accentColor)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-
-                Text(description)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
 // MARK: - Small Widget Preview
 
 private struct SmallWidgetPreview: View {
     let metric: SmallWidgetMetric
     let colorMode: WidgetColorMode
     let customColor: Color
+    var showPaceMarker: Bool = true
     let usage: ClaudeUsage?
 
     // Computed data from real usage or fallback to sample
@@ -502,6 +510,21 @@ private struct SmallWidgetPreview: View {
                     )
                     .rotationEffect(.degrees(-90))
 
+                // Pace marker dot on ring circumference
+                if showPaceMarker, metric != .extra {
+                    let elapsed = previewElapsedFraction
+                    let angleRadians = (-Double.pi / 2) + (elapsed * 2 * Double.pi)
+                    let radius: CGFloat = (100 - 8) / 2  // ring size - lineWidth
+                    let centerPt: CGFloat = 100 / 2
+                    Circle()
+                        .fill(previewPaceColor)
+                        .frame(width: 5, height: 5)
+                        .position(
+                            x: centerPt + radius * cos(angleRadians),
+                            y: centerPt + radius * sin(angleRadians)
+                        )
+                }
+
                 VStack(spacing: 0) {
                     Text("\(Int(previewPercentage))%")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -538,6 +561,40 @@ private struct SmallWidgetPreview: View {
         colorForUsage(previewPercentage, mode: colorMode, customColor: customColor)
     }
 
+    /// Elapsed fraction computed from real reset time data
+    private var previewElapsedFraction: Double {
+        guard let usage = usage else { return 0.4 }
+        let resetTime: Date
+        let duration: TimeInterval
+        switch metric {
+        case .session:
+            resetTime = usage.sessionResetTime
+            duration = 5 * 60 * 60
+        case .weekly, .opus, .sonnet:
+            resetTime = usage.weeklyResetTime
+            duration = 7 * 24 * 60 * 60
+        case .extra:
+            return 0.4
+        }
+        guard resetTime > Date() else { return 1.0 }
+        let remaining = resetTime.timeIntervalSince(Date())
+        let elapsed = duration - remaining
+        return min(max(elapsed / duration, 0), 1)
+    }
+
+    /// Pace dot color for preview based on percentage vs elapsed
+    private var previewPaceColor: Color {
+        let projected = previewPercentage / max(previewElapsedFraction, 0.01)
+        switch projected {
+        case ..<50: return .green
+        case 50..<75: return .teal
+        case 75..<90: return .yellow
+        case 90..<100: return .orange
+        case 100..<120: return .red
+        default: return .purple
+        }
+    }
+
     private var previewBackground: some View {
         RoundedRectangle(cornerRadius: 16)
             .fill(.ultraThinMaterial)
@@ -557,6 +614,7 @@ private struct MediumWidgetPreview: View {
     let rightMetric: SmallWidgetMetric
     let colorMode: WidgetColorMode
     let customColor: Color
+    var showPaceMarker: Bool = true
     let usage: ClaudeUsage?
 
     var body: some View {
@@ -580,13 +638,17 @@ private struct MediumWidgetPreview: View {
                     metric: leftMetric,
                     percentage: percentageFor(leftMetric),
                     colorMode: colorMode,
-                    customColor: customColor
+                    customColor: customColor,
+                    showPaceMarker: showPaceMarker,
+                    usage: usage
                 )
                 PreviewUsageCard(
                     metric: rightMetric,
                     percentage: percentageFor(rightMetric),
                     colorMode: colorMode,
-                    customColor: customColor
+                    customColor: customColor,
+                    showPaceMarker: showPaceMarker,
+                    usage: usage
                 )
             }
         }
@@ -639,6 +701,8 @@ private struct PreviewUsageCard: View {
     let percentage: Double
     let colorMode: WidgetColorMode
     let customColor: Color
+    var showPaceMarker: Bool = true
+    let usage: ClaudeUsage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -666,9 +730,20 @@ private struct PreviewUsageCard: View {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(statusColor)
                         .frame(width: geometry.size.width * (percentage / 100))
+
+                    // Pace marker dot on bottom edge
+                    if showPaceMarker, metric != .extra {
+                        let elapsed = previewElapsedFraction
+                        let tickX = geometry.size.width * elapsed
+                        Circle()
+                            .fill(previewPaceColor)
+                            .frame(width: 5, height: 5)
+                            .position(x: tickX, y: 8)  // Bottom edge of progress bar
+                    }
                 }
             }
             .frame(height: 8)
+            .padding(.bottom, 3)
 
             // Reset time
             Text("Resets Today 4PM")
@@ -696,6 +771,40 @@ private struct PreviewUsageCard: View {
 
     private var statusColor: Color {
         colorForUsage(percentage, mode: colorMode, customColor: customColor)
+    }
+
+    /// Elapsed fraction computed from real reset time data
+    private var previewElapsedFraction: Double {
+        guard let usage = usage else { return 0.4 }
+        let resetTime: Date
+        let duration: TimeInterval
+        switch metric {
+        case .session:
+            resetTime = usage.sessionResetTime
+            duration = 5 * 60 * 60
+        case .weekly, .opus, .sonnet:
+            resetTime = usage.weeklyResetTime
+            duration = 7 * 24 * 60 * 60
+        case .extra:
+            return 0.4
+        }
+        guard resetTime > Date() else { return 1.0 }
+        let remaining = resetTime.timeIntervalSince(Date())
+        let elapsed = duration - remaining
+        return min(max(elapsed / duration, 0), 1)
+    }
+
+    private var previewPaceColor: Color {
+        let elapsed = max(previewElapsedFraction, 0.01)
+        let projected = percentage / elapsed
+        switch projected {
+        case ..<50: return .green
+        case 50..<75: return .teal
+        case 75..<90: return .yellow
+        case 90..<100: return .orange
+        case 100..<120: return .red
+        default: return .purple
+        }
     }
 }
 

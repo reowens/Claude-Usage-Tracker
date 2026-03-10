@@ -28,10 +28,9 @@ struct SmallWidgetView: View {
                             style: StrokeStyle(lineWidth: WidgetDesign.Ring.lineWidth, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut, value: metricData.percentage)
 
                     // Pace marker dot on ring circumference
-                    if let paceData = usage.paceData(for: entry.smallMetric) {
+                    if entry.showPaceMarker, let paceData = usage.paceData(for: entry.smallMetric) {
                         let angleRadians = (-Double.pi / 2) + (paceData.elapsed * 2 * Double.pi)
                         let radius = (WidgetDesign.Ring.size - WidgetDesign.Ring.lineWidth) / 2
                         let centerPt = WidgetDesign.Ring.size / 2
@@ -99,14 +98,14 @@ struct SmallWidgetView: View {
             return MetricDisplayData(
                 percentage: usage.opusPercentage,
                 resetTime: usage.weeklyResetTime,
-                status: statusLevel(for: usage.opusPercentage),
+                status: WidgetStatusLevel.from(percentage: usage.opusPercentage),
                 label: "Opus"
             )
         case .sonnet:
             return MetricDisplayData(
                 percentage: usage.sonnetPercentage,
                 resetTime: usage.weeklyResetTime,
-                status: statusLevel(for: usage.sonnetPercentage),
+                status: WidgetStatusLevel.from(percentage: usage.sonnetPercentage),
                 label: "Sonnet"
             )
         case .extra:
@@ -119,23 +118,16 @@ struct SmallWidgetView: View {
         }
     }
 
-    private func statusLevel(for percentage: Double) -> WidgetStatusLevel {
-        switch percentage {
-        case 0..<50:
-            return .safe
-        case 50..<80:
-            return .moderate
-        default:
-            return .critical
-        }
-    }
-
     private func subtitleText(for metric: WidgetSmallMetric, metricData: MetricDisplayData, usage: WidgetUsageData) -> String {
         // For extra metric, show cost amount
         if metric == .extra {
             return usage.formattedExtraUsed ?? "$0.00"
         }
-        // For all other metrics, show reset time
+        // Session uses compact "Resets X:XXPM" format (no day prefix)
+        if metric == .session {
+            return WidgetDateFormatter.sessionResetTimeString(from: metricData.resetTime)
+        }
+        // All other metrics show full reset time with day
         return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
     }
 

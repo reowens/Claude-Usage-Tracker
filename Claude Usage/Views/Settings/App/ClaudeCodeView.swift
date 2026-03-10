@@ -524,9 +524,6 @@ struct ClaudeCodeView: View {
         SharedDataStore.shared.saveStatuslineShowResetLabel(showResetLabel)
 
         do {
-            // Install scripts to ~/.claude/
-            try StatuslineService.shared.installScripts()
-
             // Write configuration file
             let profileName = ProfileManager.shared.activeProfile?.name ?? ""
             try StatuslineService.shared.updateConfiguration(

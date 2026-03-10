@@ -34,7 +34,8 @@ struct MediumWidgetView: View {
                         metric: entry.mediumLeftMetric,
                         usage: usage,
                         colorMode: entry.colorMode,
-                        customColorHex: entry.customColorHex
+                        customColorHex: entry.customColorHex,
+                        showPaceMarker: entry.showPaceMarker
                     )
 
                     // Right card
@@ -42,7 +43,8 @@ struct MediumWidgetView: View {
                         metric: entry.mediumRightMetric,
                         usage: usage,
                         colorMode: entry.colorMode,
-                        customColorHex: entry.customColorHex
+                        customColorHex: entry.customColorHex,
+                        showPaceMarker: entry.showPaceMarker
                     )
                 }
             }
@@ -93,6 +95,7 @@ struct UsageCard: View {
     let usage: WidgetUsageData
     let colorMode: WidgetColorDisplayMode
     let customColorHex: String
+    var showPaceMarker: Bool = true
 
     private var metricData: MetricDisplayData {
         getMetricData(for: metric, usage: usage)
@@ -126,17 +129,18 @@ struct UsageCard: View {
                         .fill(statusColor)
                         .frame(width: geometry.size.width * min(metricData.percentage / 100, 1.0))
 
-                    // Pace marker tick
-                    if let paceData = usage.paceData(for: metric) {
+                    // Pace marker dot on bottom edge of progress bar
+                    if showPaceMarker, let paceData = usage.paceData(for: metric) {
                         let tickX = geometry.size.width * paceData.elapsed
-                        RoundedRectangle(cornerRadius: 0.5)
+                        Circle()
                             .fill(paceData.pace.color)
-                            .frame(width: 1.5, height: WidgetDesign.Spacing.progressHeight)
-                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight / 2)
+                            .frame(width: 5, height: 5)
+                            .position(x: tickX, y: WidgetDesign.Spacing.progressHeight)
                     }
                 }
             }
             .frame(height: WidgetDesign.Spacing.progressHeight)
+            .padding(.bottom, 3)
 
             // Reset time or cost (for extra metric)
             Text(subtitleText(for: metric, metricData: metricData, usage: usage))
@@ -176,13 +180,13 @@ struct UsageCard: View {
             return MetricDisplayData(
                 percentage: usage.opusPercentage,
                 resetTime: usage.weeklyResetTime,
-                status: statusLevel(for: usage.opusPercentage)
+                status: WidgetStatusLevel.from(percentage: usage.opusPercentage)
             )
         case .sonnet:
             return MetricDisplayData(
                 percentage: usage.sonnetPercentage,
                 resetTime: usage.weeklyResetTime,
-                status: statusLevel(for: usage.sonnetPercentage)
+                status: WidgetStatusLevel.from(percentage: usage.sonnetPercentage)
             )
         case .extra:
             return MetricDisplayData(
@@ -190,17 +194,6 @@ struct UsageCard: View {
                 resetTime: usage.weeklyResetTime,  // Extra usage typically resets weekly
                 status: usage.extraStatusLevel
             )
-        }
-    }
-
-    private func statusLevel(for percentage: Double) -> WidgetStatusLevel {
-        switch percentage {
-        case 0..<50:
-            return .safe
-        case 50..<80:
-            return .moderate
-        default:
-            return .critical
         }
     }
 
@@ -223,7 +216,11 @@ struct UsageCard: View {
         if metric == .extra {
             return usage.formattedExtraUsed ?? "$0.00"
         }
-        // For all other metrics, show reset time
+        // Session uses compact "Resets X:XXPM" format (no day prefix)
+        if metric == .session {
+            return WidgetDateFormatter.sessionResetTimeString(from: metricData.resetTime)
+        }
+        // All other metrics show full reset time with day
         return WidgetDateFormatter.resetTimeString(from: metricData.resetTime)
     }
 }

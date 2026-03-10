@@ -273,7 +273,7 @@ struct SettingsView: View {
                 case .general:
                     GeneralSettingsView()
                 case .menuBar:
-                    MenuBarSettingsView()
+                    AppearanceSettingsView()
                 case .widgets:
                     WidgetSettingsView()
                 case .history:

@@ -8,9 +8,15 @@
 import SwiftUI
 
 extension View {
-    /// Applies Liquid Glass card background to a widget card/tile.
-    /// Replaces the manual Color.white.opacity(0.05) + cornerRadius pattern.
+    /// Applies a subtle card background to a widget card/tile.
+    /// Uses a semi-transparent white tint that stays visible in both active and idle widget states.
+    /// Note: Materials (.ultraThinMaterial) go opaque in idle state, hiding content.
     func widgetCardBackground() -> some View {
-        self.glassEffect(.regular, in: .rect(cornerRadius: WidgetDesign.Spacing.cardCornerRadius))
+        self.background(Color.white.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: WidgetDesign.Spacing.cardCornerRadius)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            )
+            .cornerRadius(WidgetDesign.Spacing.cardCornerRadius)
     }
 }

@@ -431,10 +431,10 @@
 "appearance.pace_marker_section_subtitle" = "Nutzungstempo relativ zu Zurücksetzungszeiträumen verfolgen";
 "appearance.show_time_marker_title" = "Zeitmarkierung anzeigen";
 "appearance.show_time_marker_description" = "Eine Markierung auf Fortschrittsbalken anzeigen, die den Zeitfortschritt im Zeitraum zeigt";
-"appearance.show_pace_marker_title" = "Markierung nach Tempo einfärben";
-"appearance.show_pace_marker_description" = "Die Zeitmarkierung nach dem prognostizierten Nutzungstempo einfärben (grün → lila). Gilt für Sitzungs- und Wochenmetriken.";
-"appearance.pace_coloring_title" = "Tempobasierte Balkenfarben";
-"appearance.pace_coloring_description" = "Fortschrittsbalken basierend auf dem prognostizierten Tempo statt dem aktuellen Nutzungsniveau einfärben. Prognostiziert, ob Limits bis zum Ende des Zeitraums erreicht werden.";
+"appearance.show_pace_marker_title" = "Tempo-Markierungsfarben";
+"appearance.show_pace_marker_description" = "Tempo-Markierung nach 6-stufigem prognostiziertem Tempo einfärben";
+"appearance.pace_coloring_title" = "Tempo-Balkenfarben";
+"appearance.pace_coloring_description" = "Fortschrittsbalken nach prognostiziertem Tempo statt Nutzungsniveau einfärben";
 "appearance.multiprofile_locked_title" = "Darstellungseinstellungen gesperrt";
 "appearance.multiprofile_locked_description" = "Diese Einstellungen sind deaktiviert, während die Mehrfach-Profil-Anzeige aktiv ist. Jedes Profil verwendet im Mehrfach-Profil-Modus seine eigene Darstellung.";
 "appearance.disable_multiprofile" = "Mehrfach-Profil-Anzeige ausschalten";

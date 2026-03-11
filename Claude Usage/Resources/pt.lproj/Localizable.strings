@@ -429,10 +429,10 @@
 "appearance.pace_marker_section_subtitle" = "Acompanhe o ritmo de uso em relação aos períodos de reinício";
 "appearance.show_time_marker_title" = "Mostrar marcador de tempo";
 "appearance.show_time_marker_description" = "Exibir uma marca nas barras de progresso mostrando quanto do período de tempo já passou";
-"appearance.show_pace_marker_title" = "Colorir marcador por ritmo";
-"appearance.show_pace_marker_description" = "Colore o marcador de tempo pelo ritmo de uso projetado (verde → roxo). Aplica-se a métricas de sessão e semanais.";
-"appearance.pace_coloring_title" = "Cores de barra por ritmo";
-"appearance.pace_coloring_description" = "Colorir barras de progresso com base no ritmo projetado em vez do nível de uso atual. Projeta se você atingirá os limites até o final do período.";
+"appearance.show_pace_marker_title" = "Cores do marcador de ritmo";
+"appearance.show_pace_marker_description" = "Colorir o marcador de ritmo pelo ritmo projetado em 6 níveis";
+"appearance.pace_coloring_title" = "Cores da barra de ritmo";
+"appearance.pace_coloring_description" = "Colorir a barra de progresso pelo ritmo projetado em vez do nível de uso";
 "appearance.multiprofile_locked_title" = "Configurações de Aparência Bloqueadas";
 "appearance.multiprofile_locked_description" = "Estas configurações estão desativadas enquanto a Exibição Multi-Perfil está ativa. Cada perfil usa sua própria aparência no modo multi-perfil.";
 "appearance.disable_multiprofile" = "Desativar Exibição Multi-Perfil";

@@ -202,8 +202,8 @@ struct WidgetSettingsView: View {
 
                 if showPaceMarker {
                     SettingToggle(
-                        title: "Pace tier colors",
-                        description: "6-tier projected pace (green → purple)",
+                        title: "Pace marker colors",
+                        description: "Color the pace marker by 6-tier projected pace",
                         isOn: Binding(
                             get: { paceMarkerStepColors },
                             set: { newValue in
@@ -217,8 +217,8 @@ struct WidgetSettingsView: View {
                 }
 
                 SettingToggle(
-                    title: "Pace-Aware Bar Colors",
-                    description: "Color progress bar based on projected pace instead of current usage level",
+                    title: "Pace bar colors",
+                    description: "Color the progress bar by projected pace instead of usage level",
                     isOn: Binding(
                         get: { paceAwareBarColors },
                         set: { newValue in
